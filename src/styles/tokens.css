@@ -1,0 +1,59 @@
+/* Design tokens — industrial HMI / stamped-label look. Owner: ui module (may extend). */
+:root {
+  /* palette */
+  --c-charcoal: #252b2b;
+  --c-gunmetal: #465356;
+  --c-concrete: #85857d;
+  --c-rust: #a95e39;
+  --c-hazard: #e9b63f;
+  --c-safety: #e57d35;
+  --c-furnace: #ffb05a;
+  --c-teal: #638c88;
+  --c-cream: #eae3d2;
+  --c-soot: #1a1e1f;
+  --c-paper: #f3ecdc;
+  --c-paper-ink: #2a2622;
+  --c-signal-red: #d9483b;
+  --c-signal-green: #5dbb63;
+  --c-link: #2f6f86;
+  --c-link-on-dark: #9fd4e0;
+
+  /* semantic */
+  --bg: var(--c-charcoal);
+  --fg: var(--c-cream);
+  --hmi-bg: rgba(26, 30, 31, 0.92);
+  --hmi-border: #5b686a;
+  --hmi-fg: #e9e4d6;
+  --hmi-dim: #aab3b1;
+  --accent: var(--c-hazard);
+  --focus: #ffd166;
+
+  /* type */
+  --font-display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --font-body: 'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* spacing / shape */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius: 4px;
+  --radius-lg: 8px;
+  --shadow-panel: 0 18px 50px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(255, 255, 255, 0.04) inset;
+
+  /* layers */
+  --z-canvas: 0;
+  --z-hud: 10;
+  --z-touch: 20;
+  --z-topbar: 30;
+  --z-panel: 50;
+  --z-toast: 60;
+  --z-fade: 70;
+  --z-loading: 80;
+
+  /* touch targets */
+  --tap: 48px;
+}

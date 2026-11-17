@@ -1,0 +1,107 @@
+.miw-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(10, 12, 12, 0.55);
+}
+
+.miw-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: min(88vh, 900px);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+.miw-panel--sm { max-width: 440px; }
+.miw-panel--md { max-width: 680px; }
+.miw-panel--lg { max-width: 960px; }
+
+.miw-panel--paper {
+  background: var(--c-paper);
+  color: var(--c-paper-ink);
+  border: 2px solid #c9bfa8;
+}
+.miw-panel--paper a { color: var(--c-link); }
+
+.miw-panel--hmi {
+  background: var(--hmi-bg);
+  color: var(--hmi-fg);
+  border: 2px solid var(--hmi-border);
+}
+
+.miw-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  border-bottom: 3px solid var(--c-hazard);
+}
+
+.miw-panel__kicker {
+  margin: 0 0 2px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.miw-panel__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.miw-panel__close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 2px solid currentColor;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.miw-panel__close:hover { background: rgba(0, 0, 0, 0.08); }
+
+.miw-panel__fiction {
+  margin: 0;
+  padding: 4px var(--space-5);
+  background: repeating-linear-gradient(-45deg, #e9b63f 0 12px, #252b2b 12px 24px);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-shadow: 0 1px 2px #000;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.miw-panel__body {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.miw-panel__footer {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 600px) {
+  .miw-panel-backdrop { padding: 0; align-items: stretch; }
+  .miw-panel { max-height: 100%; border-radius: 0; }
+}
