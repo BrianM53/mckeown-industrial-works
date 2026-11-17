@@ -7,28 +7,36 @@ export interface PanelComponentProps {
   onClose: () => void
 }
 
+type PanelModule = { default: ComponentType<PanelComponentProps> }
 type LazyPanel = LazyExoticComponent<ComponentType<PanelComponentProps>>
 
 /**
  * PanelId → lazily loaded component. Owner: ui module.
  * 'console' is owned by the factory-sim module (src/factory/ui/ConsolePanel.tsx) — keep that mapping.
  */
-const placeholder = lazy(() => import('./PlaceholderPanel'))
+const loaders: Record<PanelId, () => Promise<PanelModule>> = {
+  resume: () => import('./ResumePanel'),
+  harmony: () => import('./HarmonyPanel'),
+  codestory: () => import('./CodeStoryPanel'),
+  github: () => import('./GithubPanel'),
+  project: () => import('./ProjectPanel'),
+  rec: () => import('./RecPanel'),
+  rnd: () => import('./RndPanel'),
+  contact: () => import('./ContactPanel'),
+  about: () => import('./AboutPanel'),
+  directory: () => import('./DirectoryPanel'),
+  settings: () => import('./SettingsPanel'),
+  help: () => import('./HelpPanel'),
+  achievements: () => import('./AchievementsPanel'),
+  quicklinks: () => import('./QuickLinksPanel'),
+  console: () => import('@/factory/ui/ConsolePanel'),
+}
 
-export const panelRegistry: Record<PanelId, LazyPanel> = {
-  resume: placeholder,
-  harmony: placeholder,
-  codestory: placeholder,
-  github: placeholder,
-  project: placeholder,
-  rec: placeholder,
-  rnd: placeholder,
-  contact: placeholder,
-  about: placeholder,
-  directory: placeholder,
-  settings: placeholder,
-  help: placeholder,
-  achievements: placeholder,
-  quicklinks: placeholder,
-  console: lazy(() => import('@/factory/ui/ConsolePanel')),
+export const panelRegistry: Record<PanelId, LazyPanel> = Object.fromEntries(
+  (Object.keys(loaders) as PanelId[]).map((id) => [id, lazy(loaders[id])]),
+) as Record<PanelId, LazyPanel>
+
+/** Warm every panel chunk (called once the page is idle) so panels open instantly. */
+export function preloadPanels(): void {
+  for (const load of Object.values(loaders)) load().catch(() => {})
 }

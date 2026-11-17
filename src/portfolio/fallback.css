@@ -1,0 +1,137 @@
+/*
+ * In-app HTML fallback (FallbackPortfolio): a fixed, self-scrolling layer that starts right
+ * under the ui module's top bar (the app root is overflow:hidden). The layer is offset rather
+ * than padded, so the sticky section nav and #anchor jumps line up under the bar in every browser.
+ */
+
+.pf-fallback {
+  /* Height of the ui top bar (tokens from src/styles/tokens.css, with safe fallbacks). */
+  --pf-top: calc(var(--topbar-h, 56px) + var(--safe-top, 0px));
+
+  position: fixed;
+  inset: var(--pf-top) 0 0 0;
+  z-index: 1; /* above the (absent) canvas, below the top bar, panels and toasts */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: #252b2b;
+  scroll-behavior: smooth;
+}
+
+.pf-fallback__main {
+  display: block;
+  min-height: 100%;
+}
+
+.pf-fallback__main:focus {
+  outline: none;
+}
+
+/* Status strip: why the visitor is seeing the HTML version. */
+
+.pf-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  padding: 0.9rem var(--pf-gutter);
+  border-bottom: 1px solid #000;
+  background: var(--pf-soot);
+  color: var(--pf-cream);
+}
+
+.pf-notice:focus {
+  outline: 3px solid var(--pf-hazard);
+  outline-offset: -3px;
+}
+
+.pf-notice__lamp {
+  display: inline-block;
+  flex: none;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-right: 0.55rem;
+  vertical-align: -0.1rem;
+  border: 2px solid rgba(0, 0, 0, 0.55);
+  border-radius: 50%;
+  background: var(--pf-lamp, #e9b63f);
+  box-shadow: 0 0 12px var(--pf-lamp, #e9b63f);
+}
+
+.pf-notice--requested {
+  --pf-lamp: #5dbb63;
+}
+
+.pf-notice--no-webgl {
+  --pf-lamp: #e9b63f;
+}
+
+.pf-notice--error {
+  --pf-lamp: #e8604f;
+}
+
+.pf-notice__body {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+
+.pf-notice__label {
+  color: var(--pf-hazard);
+  font-family: var(--pf-font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.pf-notice__text {
+  max-width: 75ch;
+  margin-top: 0.15rem;
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.pf-notice .pf-btn {
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-fallback {
+    scroll-behavior: auto;
+  }
+}
+
+/*
+ * Print the document, not the app chrome. While a ui panel is open (e.g. the résumé panel),
+ * src/styles/global.css prints only that panel and hides this layer, so the app chrome must
+ * stay printable then; otherwise both rules together would print a blank page.
+ */
+@media print {
+  html:has(.pf-fallback),
+  body:has(.pf-fallback),
+  body:has(.pf-fallback) #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  html:has(.pf-fallback):not(:has(.miw-panel)) {
+    font-size: 10.5pt;
+  }
+
+  body:has(.pf-fallback):not(:has(.miw-panel)) .ui-root {
+    display: none !important;
+  }
+
+  .pf-fallback {
+    position: static;
+    inset: auto;
+    overflow: visible;
+    background: #fff;
+  }
+
+  .pf-notice {
+    display: none !important;
+  }
+}

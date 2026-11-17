@@ -14,8 +14,8 @@ export const PROJECTS: ProjectContent[] = [
     oneLiner:
       'Senior capstone team project that extended open-source Gaussian-SLAM research code to build a 3D reconstruction live from streamed video frames, viewable in the browser as it grows.',
     details: [
-      'Five-person Texas A&M senior capstone (Spring 2025) for industry sponsor SpatialGen. The team added frame-by-frame streaming input, depth estimation from video, and a live browser viewer on top of Gaussian-SLAM by Yugay et al.',
-      'Brian oversaw scope and deliverables, managed the product backlog, and coordinated with the sponsor.',
+      'Five-person Texas A&M senior capstone (CSCE 482, Spring 2025) for SpatialGen. The team added frame-by-frame streaming input, depth estimation from video, and a live browser viewer on top of Gaussian-SLAM by Yugay et al.',
+      'Brian’s documented role: overseeing scope and deliverables and managing the product backlog.',
     ],
     tech: ['Python', 'Shell'],
     featured: true,
@@ -29,12 +29,12 @@ export const PROJECTS: ProjectContent[] = [
     name: 'Row-Pergfect 1.0',
     url: 'https://github.com/BrianM53/Row-Pergfect-1.0',
     oneLiner:
-      'A smart rowing-machine handle: two motion sensors on a Raspberry Pi watch each stroke and light up LEDs when the rower’s form goes wrong.',
+      'A smart rowing-machine handle: two motion sensors watch each stroke and light up LEDs when the rower’s form goes wrong.',
     details: [
-      'Solo course project (Texas A&M, 2024) built for a Concept2 RowErg. It flags pulling left or right, rushing the arms back, and pausing mid-stroke, in real time.',
-      'The project report is candid about limits: left/right detection was sometimes confused.',
+      'Solo course project (Texas A&M CSCE 462, April 2024) built for a Concept2 RowErg. It flags pulling left or right, rushing the arms back, and pausing mid-stroke, in real time.',
+      'Per the project report: it caught pauses almost every time, and rushes and left/right errors about 80% of the time.',
     ],
-    tech: ['Python', 'Raspberry Pi', 'MPU6050 IMU sensors'],
+    tech: ['Python', 'Raspberry Pi GPIO', 'MPU6050 IMU sensors'],
     featured: true,
     station: 'rnd',
     verified: true,

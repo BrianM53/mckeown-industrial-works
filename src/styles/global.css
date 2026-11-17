@@ -1,4 +1,4 @@
-/* Global base styles. Owner: ui module (may extend). */
+/* Global base styles. Owner: ui module. */
 *,
 *::before,
 *::after {
@@ -12,11 +12,16 @@ body,
   height: 100%;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
@@ -27,6 +32,12 @@ body {
   overflow: hidden;
 }
 
+/*
+ * Fallback (HTML portfolio) mode keeps the app root overflow:hidden: the
+ * portfolio-static module renders its own fixed, self-scrolling layer starting
+ * at var(--topbar-h) + var(--safe-top). UIRoot still sets html[data-miw-mode].
+ */
+
 a {
   color: var(--c-link-on-dark);
 }
@@ -34,6 +45,11 @@ a {
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+::selection {
+  background: var(--c-hazard);
+  color: var(--c-soot);
 }
 
 .sr-only {
@@ -59,17 +75,67 @@ a {
 }
 
 .boot-fallback {
-  padding: var(--space-6);
+  padding: calc(var(--topbar-h) + var(--space-6)) var(--space-6) var(--space-6);
   font-family: var(--font-mono);
 }
 
+/*
+ * Reduced motion. The OS preference applies until the visitor explicitly allows
+ * motion in Settings (UIRoot then sets html.miw-motion-ok); the in-site setting
+ * (html.miw-reduced-motion) applies regardless of the OS.
+ */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  html:not(.miw-motion-ok) *,
+  html:not(.miw-motion-ok) *::before,
+  html:not(.miw-motion-ok) *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+html.miw-reduced-motion *,
+html.miw-reduced-motion *::before,
+html.miw-reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Print: never print the 3D view or HUD. An open panel prints as a clean document. */
+.miw-print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 14mm 16mm;
+  }
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .game-canvas,
+  .miw-topbar,
+  .miw-hud,
+  .miw-touch,
+  .miw-loading,
+  .miw-fade,
+  .miw-toasts,
+  .no-print {
+    display: none !important;
+  }
+  body:has(.miw-panel) #root > :not(.ui-root) {
+    display: none !important;
+  }
+  .miw-print-only {
+    display: block;
   }
 }

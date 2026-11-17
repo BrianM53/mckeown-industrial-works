@@ -1,0 +1,38 @@
+/*
+ * Base styles for the prerendered, script-free /portfolio/ page only
+ * (inlined after portfolio.css by scripts/prerender.tsx). Not used inside the app.
+ */
+
+html {
+  background: #252b2b;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f3ecdc;
+}
+
+body > .pf {
+  min-height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+@media print {
+  html {
+    font-size: 10.5pt;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+}

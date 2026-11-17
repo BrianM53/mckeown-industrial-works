@@ -4,6 +4,8 @@ import { Physics } from '@react-three/rapier'
 import { simClock } from '@/core/clock'
 import { params } from '@/core/params'
 import { registerDebug, setDebugFlag, DEBUG_ENABLED } from '@/core/debug'
+import { events } from '@/core/events'
+import { listInteractables } from '@/core/interaction'
 import { runtime } from '@/core/runtime'
 import { useGameStore } from '@/state/game'
 import { useSettings } from '@/state/settings'
@@ -67,11 +69,24 @@ function SimDriver() {
       get: () => ({ t: simClock.t, timeScale: simClock.timeScale }),
     })
     const offDir = registerDebug('director', { active: () => director.activeIds(), reset: () => director.reset() })
+    const offCore = registerDebug('core', {
+      /** Leak checks: subscriber counts must stay flat across repeated panel opens / resets. */
+      counts: () => ({ events: events.count(), clockSubs: simClock.subscriberCount, interactables: listInteractables().length }),
+      runtime: () => ({
+        player: runtime.player.position.toArray(),
+        mode: runtime.player.mode,
+        camera: runtime.camera.position.toArray(),
+        interior: runtime.world.interior,
+        lighting: { ...runtime.lighting },
+        fps: Math.round(runtime.frame.fps),
+      }),
+    })
     return () => {
       factory.stop()
       offSup()
       offDbg()
       offDir()
+      offCore()
     }
   }, [])
   useFrame((_, delta) => simClock.step(delta), -100)
@@ -81,6 +96,23 @@ function SimDriver() {
 /** Smoothed FPS + automatic quality downgrade when quality is 'auto'. */
 function PerfMonitor() {
   const acc = useRef({ frames: 0, time: 0, lowFor: 0 })
+  const { gl } = useThree()
+  useEffect(
+    () =>
+      registerDebug('perf', {
+        /** Renderer stats of the last frame + smoothed fps (perf script / tests). */
+        stats: () => ({
+          fps: Math.round(runtime.frame.fps * 10) / 10,
+          calls: gl.info.render.calls,
+          triangles: gl.info.render.triangles,
+          geometries: gl.info.memory.geometries,
+          textures: gl.info.memory.textures,
+          programs: gl.info.programs?.length ?? 0,
+          quality: useGameStore.getState().quality,
+        }),
+      }),
+    [gl],
+  )
   useFrame((_, delta) => {
     const a = acc.current
     a.frames++

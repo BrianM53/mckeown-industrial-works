@@ -1,0 +1,40 @@
+# Weekly check that every external link the site shows still resolves (owner review aid).
+# Fails only when a link marked `verified: true` in src/content/* is broken or unreachable;
+# LinkedIn's bot block (HTTP 999) and unverified links are reported, not failed.
+name: Link check
+
+on:
+  schedule:
+    - cron: '17 9 * * 1' # Mondays 09:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SITE_URL: https://brianm53.github.io/mckeown-industrial-works/
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check links over the network
+        run: npx tsx scripts/check-links.ts --network --strict --json link-report.json
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: link-report
+          path: link-report.json
+          if-no-files-found: ignore

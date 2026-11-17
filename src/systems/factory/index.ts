@@ -1,76 +1,82 @@
 /**
- * Factory simulation entry point. TEMPORARY STUB — the factory-sim module
- * replaces this with the real implementation (sim.ts) keeping the exports:
- *   export const factory: FactorySim
- *   export function useFactory<T>(selector: (s: FactoryState) => T): T
- *   export * from './types'
+ * Factory simulation entry point (factory-sim module).
+ *
+ *   factory            — the app-wide FactorySim, ticked by core/clock simClock.
+ *                        world/Scene.tsx SimDriver calls setSeed(?seed) and start().
+ *   useFactory(sel)    — React hook; re-renders only when the selected value changes.
+ *
+ * For 3D modules: read `factory.state` inside useFrame (it is mutated in place
+ * every tick). Useful facts (see config.ts for the numbers):
+ *  - lines[id].items: positions 0..1 from LineDef.zStart (0) to zEnd (1), sorted
+ *    DESCENDING (index 0 is nearest the tower). The item at index i was made by
+ *    machine cycle `cycles - (items.length - 1 - i)` (stable per-item variety).
+ *  - lines[id].phase: machine cycle 0..1; a part is ejected onto the belt at the
+ *    wrap (1 → 0). Phase holds at 0 while the line waits for belt room.
+ *  - lines[id].status 'blocked': the tower's hopper for this line is full; parts
+ *    queue at the belt end and the belt stops once packed. `rate` is 0 while the
+ *    machine waits. Extra runtime field `beltSpeed` (see LineStateWithBelt).
+ *  - rocket.transport: eased 0→1 during 'rollout'; 1 on the pad; eases back
+ *    1→0 across 'aftermath' + 'reset' (the empty transporter returns).
+ *  - rocket.outcome is decided at 'ignition'; the outcome becomes visible
+ *    OUTCOME_REVEAL_AT[outcome] seconds into 'flight', when 'rocket:outcome'
+ *    fires and the counters update.
+ *  - 'rocket:stage' payload: `stage` = 0-based index of the stage just
+ *    completed, `stageName` = ROCKET_STAGES[stage].
+ *  - 'rocket:countdown' fires with secondsLeft 10, 9, … 1; 'rocket:ignition' is zero.
+ *  - 'factory:part' is throttled (≤ 2.5/s); `total` = parts that line has
+ *    delivered this session.
+ *  - The sim emits captions for the countdown and the PA announcer but no
+ *    'sfx' or 'shake' — audio/rocket modules map rocket:* events to those.
  */
-import { useSyncExternalStore } from 'react'
-import type { LineId } from '@/core/types'
-import type { FactorySim, FactoryState, LineState, OptimizationParams } from './types'
+import type { FactorySim, FactoryState } from './types'
+import { useFactoryStore } from './react'
+import { FactorySimulation } from './sim'
 
 export * from './types'
+export { FactorySimulation, type FactorySimOptions, type FactoryEmit } from './sim'
+export { useFactoryStore, shallowEqual } from './react'
+export {
+  evaluate,
+  normalizeParams,
+  paramsEqual,
+  lineCapacities,
+  rawDefectRate,
+  inspectionFactor,
+  catchRate,
+  successChanceFor,
+  displayThroughput,
+  displayDefectPercent,
+  displaySuccessPercent,
+  TARGET_DEFECT_PERCENT,
+  MODEL_EXPLAINER,
+} from './model'
+export { worldCycleSeconds, lineTargets, type LineStateWithBelt } from './production'
+export {
+  DEFAULT_PARAMS,
+  PARAM_SPECS,
+  TOTAL_PRESSES,
+  TARGET,
+  MODEL,
+  LINE_IDS,
+  LINE_LABELS,
+  PHASE_ORDER,
+  PHASE_SECONDS,
+  LAUNCH_SEQUENCE_SECONDS,
+  OUTCOME_REVEAL_AT,
+  STAGE_RECIPES,
+  INITIAL_COUNTERS,
+  DEFAULT_SEED,
+  WORLD,
+} from './config'
+export { isSuccessfulOutcome } from './outcomes'
 
-const DEFAULT_PARAMS: OptimizationParams = { conveyorSpeed: 1, inspection: 0.2, pressesToTanks: 1 }
+/** The app-wide factory simulation. */
+export const factory: FactorySim = new FactorySimulation()
 
-function line(id: LineId): LineState {
-  return { id, rate: 6, phase: 0, cycles: 0, items: [], delivered: 0, required: 4, status: 'running', defectFlash: 0 }
-}
+// Dev HMR: never leave a replaced instance ticking alongside the new one.
+if (import.meta.hot) import.meta.hot.dispose(() => factory.stop())
 
-const state: FactoryState = {
-  t: 0,
-  lines: { smelt: line('smelt'), pipe: line('pipe'), circuit: line('circuit'), tank: line('tank'), payload: line('payload') },
-  rocket: {
-    id: 1,
-    seed: 1,
-    phase: 'assembling',
-    phaseTime: 0,
-    phaseDuration: Infinity,
-    stagesComplete: 0,
-    stageProgress: 0,
-    countdown: null,
-    transport: 0,
-    outcome: null,
-    stowaway: false,
-  },
-  counters: { successes: 3, disassemblies: 41, lastDisassemblyT: -600 },
-  params: { ...DEFAULT_PARAMS },
-  model: { throughputPerHour: 10, defectRate: 0.2, successChance: 0.35, bottleneck: 'tank', meetsTarget: false, explanation: [] },
-  history: [],
-}
-
-const subs = new Set<() => void>()
-let version = 0
-
-export const factory: FactorySim = {
-  start() {},
-  stop() {},
-  state,
-  subscribe(fn) {
-    subs.add(fn)
-    return () => subs.delete(fn)
-  },
-  get version() {
-    return version
-  },
-  setParams(p) {
-    Object.assign(state.params, p)
-    version++
-    subs.forEach((f) => f())
-  },
-  resetParams() {
-    Object.assign(state.params, DEFAULT_PARAMS)
-    version++
-    subs.forEach((f) => f())
-  },
-  setSeed() {},
-  forceNextOutcome() {},
-  skipToLaunch() {},
-  reset() {},
-}
-
-/** React hook: re-renders when the sim notifies; selector runs on the live state. */
-export function useFactory<T>(selector: (s: FactoryState) => T): T {
-  useSyncExternalStore(factory.subscribe, () => factory.version)
-  return selector(factory.state)
+/** React hook: re-renders when the selected slice of the live sim state changes. */
+export function useFactory<T>(selector: (s: FactoryState) => T, isEqual?: (a: T, b: T) => boolean): T {
+  return useFactoryStore(factory, selector, isEqual)
 }

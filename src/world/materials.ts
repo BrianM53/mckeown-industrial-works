@@ -143,6 +143,219 @@ export const textures = {
       for (let y = 0; y < s; y += 16) ctx.fillRect(0, y, s, 5)
     })
   },
+
+  // ---- added by the environment module -----------------------------------
+
+  /** Tangent-space normal map of corrugated sheet ribs (8 ribs across U; linear color space). */
+  corrugatedNormal(): THREE.Texture {
+    const t = canvasTexture('corrugatedNormal', 128, (ctx, s) => {
+      const img = ctx.createImageData(s, s)
+      for (let x = 0; x < s; x++) {
+        const a = (x / s) * Math.PI * 2 * 8
+        // slightly squared sine profile reads like trapezoidal sheet
+        const dh = Math.cos(a) + 0.6 * Math.cos(3 * a)
+        const nx = -dh * 0.62
+        const inv = 1 / Math.hypot(nx, 1)
+        const r = Math.round((nx * inv * 0.5 + 0.5) * 255)
+        const b = Math.round((inv * 0.5 + 0.5) * 255)
+        for (let y = 0; y < s; y++) {
+          const i = (y * s + x) * 4
+          img.data[i] = r
+          img.data[i + 1] = 128
+          img.data[i + 2] = b
+          img.data[i + 3] = 255
+        }
+      }
+      ctx.putImageData(img, 0, 0)
+    })
+    t.colorSpace = THREE.NoColorSpace
+    return t
+  },
+  /** Near-white painted-metal wear (smudges, scratches, speckle). Multiply with a base/vertex color. */
+  paintWear(): THREE.Texture {
+    return canvasTexture('paintWear', 256, (ctx, s) => {
+      ctx.fillStyle = '#ececea'
+      ctx.fillRect(0, 0, s, s)
+      const r = noiseRand(33)
+      for (let i = 0; i < 28; i++) {
+        const g = ctx.createRadialGradient(r() * s, r() * s, 0, r() * s, r() * s, 10 + r() * 50)
+        g.addColorStop(0, `rgba(90,82,70,${0.05 + r() * 0.08})`)
+        g.addColorStop(1, 'rgba(90,82,70,0)')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, s, s)
+      }
+      for (let i = 0; i < 1800; i++) {
+        const v = Math.floor(170 + r() * 80)
+        ctx.fillStyle = `rgba(${v},${v - 4},${v - 10},${0.12 + r() * 0.2})`
+        ctx.fillRect(r() * s, r() * s, 1 + r() * 2, 1 + r() * 2)
+      }
+      ctx.strokeStyle = 'rgba(255,255,250,0.35)'
+      ctx.lineWidth = 1
+      for (let i = 0; i < 26; i++) {
+        const x = r() * s
+        const y = r() * s
+        ctx.beginPath()
+        ctx.moveTo(x, y)
+        ctx.lineTo(x + (r() - 0.5) * 40, y + (r() - 0.5) * 14)
+        ctx.stroke()
+      }
+      // a few drip streaks
+      for (let i = 0; i < 16; i++) {
+        const x = r() * s
+        const y = r() * s * 0.5
+        const len = 30 + r() * 90
+        const g = ctx.createLinearGradient(x, y, x, y + len)
+        g.addColorStop(0, `rgba(110,70,40,${0.1 + r() * 0.12})`)
+        g.addColorStop(1, 'rgba(110,70,40,0)')
+        ctx.fillStyle = g
+        ctx.fillRect(x, y, 1.5 + r() * 2.5, len)
+      }
+    })
+  },
+  /** Neutral running-bond brick (dark recessed mortar). Tint with a base/vertex color. */
+  brick(): THREE.Texture {
+    return canvasTexture('brick', 256, (ctx, s) => {
+      ctx.fillStyle = '#7d7973'
+      ctx.fillRect(0, 0, s, s)
+      const r = noiseRand(51)
+      const rows = 8
+      const cols = 4
+      const bh = s / rows
+      const bw = s / cols
+      for (let j = 0; j < rows; j++) {
+        const off = j % 2 ? bw / 2 : 0
+        for (let i = -1; i < cols + 1; i++) {
+          const v = 200 + Math.floor(r() * 55)
+          const warm = Math.floor(r() * 10)
+          ctx.fillStyle = `rgb(${v},${v - 6 - warm},${v - 14 - warm})`
+          ctx.fillRect(i * bw + off + 2, j * bh + 2, bw - 4, bh - 4)
+          ctx.fillStyle = `rgba(255,255,255,${0.05 + r() * 0.06})`
+          ctx.fillRect(i * bw + off + 2, j * bh + 2, bw - 4, 2)
+        }
+      }
+      for (let i = 0; i < 900; i++) {
+        ctx.fillStyle = `rgba(40,30,25,${0.05 + r() * 0.1})`
+        ctx.fillRect(r() * s, r() * s, 1 + r() * 2, 1 + r() * 2)
+      }
+    })
+  },
+  /** Asphalt aggregate (multiply with an asphalt tone). */
+  asphalt(): THREE.Texture {
+    return canvasTexture('asphaltAggregate', 256, (ctx, s) => {
+      ctx.fillStyle = '#c8c8c6'
+      ctx.fillRect(0, 0, s, s)
+      const r = noiseRand(77)
+      for (let i = 0; i < 5200; i++) {
+        const v = Math.floor(120 + r() * 135)
+        ctx.fillStyle = `rgba(${v},${v},${v - 3},${0.25 + r() * 0.5})`
+        const w = 0.8 + r() * 2.2
+        ctx.fillRect(r() * s, r() * s, w, w)
+      }
+      for (let i = 0; i < 10; i++) {
+        const g = ctx.createRadialGradient(r() * s, r() * s, 0, r() * s, r() * s, 20 + r() * 60)
+        g.addColorStop(0, `rgba(20,20,20,${0.05 + r() * 0.08})`)
+        g.addColorStop(1, 'rgba(20,20,20,0)')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, s, s)
+      }
+    })
+  },
+  /** Dusty window with a warm lit interior (use on an unlit/emissive material). */
+  dustyWindow(): THREE.Texture {
+    return canvasTexture('dustyWindow', 128, (ctx, s) => {
+      const g = ctx.createLinearGradient(0, 0, 0, s)
+      g.addColorStop(0, '#ffe2ae')
+      g.addColorStop(0.55, '#f2b46e')
+      g.addColorStop(1, '#a8703e')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, s, s)
+      const r = noiseRand(91)
+      // interior silhouettes (shelves / machinery)
+      ctx.fillStyle = 'rgba(70,45,25,0.35)'
+      for (let i = 0; i < 6; i++) ctx.fillRect(r() * s, s * (0.45 + r() * 0.3), 8 + r() * 26, s)
+      ctx.fillStyle = 'rgba(255,245,220,0.35)'
+      ctx.fillRect(0, s * 0.08, s, 4)
+      // dust and grime
+      for (let i = 0; i < 700; i++) {
+        ctx.fillStyle = `rgba(120,100,80,${0.04 + r() * 0.1})`
+        ctx.fillRect(r() * s, r() * s, 1 + r() * 3, 1 + r() * 3)
+      }
+      const dirt = ctx.createLinearGradient(0, s * 0.7, 0, s)
+      dirt.addColorStop(0, 'rgba(90,70,50,0)')
+      dirt.addColorStop(1, 'rgba(90,70,50,0.45)')
+      ctx.fillStyle = dirt
+      ctx.fillRect(0, 0, s, s)
+      // diagonal glare
+      ctx.fillStyle = 'rgba(255,255,255,0.10)'
+      ctx.beginPath()
+      ctx.moveTo(s * 0.15, 0)
+      ctx.lineTo(s * 0.35, 0)
+      ctx.lineTo(s * 0.05, s)
+      ctx.lineTo(-s * 0.15, s)
+      ctx.fill()
+      // mullions
+      ctx.fillStyle = '#262b2b'
+      ctx.fillRect(0, 0, s, 5)
+      ctx.fillRect(0, s - 5, s, 5)
+      ctx.fillRect(0, 0, 5, s)
+      ctx.fillRect(s - 5, 0, 5, s)
+      ctx.fillRect(s / 2 - 2, 0, 4, s)
+      ctx.fillRect(0, s / 2 - 2, s, 4)
+    })
+  },
+  /** Square floor tile with grout edges (one tile per texture; multiply with a floor color). */
+  floorTiles(): THREE.Texture {
+    return canvasTexture('floorTiles', 128, (ctx, s) => {
+      ctx.fillStyle = '#e4e2dc'
+      ctx.fillRect(0, 0, s, s)
+      const r = noiseRand(5)
+      for (let i = 0; i < 400; i++) {
+        ctx.fillStyle = `rgba(80,76,70,${0.03 + r() * 0.06})`
+        ctx.fillRect(r() * s, r() * s, 1 + r() * 3, 1 + r() * 3)
+      }
+      ctx.fillStyle = 'rgba(60,58,54,0.55)'
+      ctx.fillRect(0, 0, s, 3)
+      ctx.fillRect(0, 0, 3, s)
+    })
+  },
+  /** Soft smoke/steam puff: alpha = density, red = top-lit shading (linear data). */
+  smokePuff(): THREE.Texture {
+    const t = canvasTexture('smokePuff', 128, (ctx, s) => {
+      ctx.clearRect(0, 0, s, s)
+      const r = noiseRand(17)
+      for (let i = 0; i < 22; i++) {
+        const a = r() * Math.PI * 2
+        const d = r() * s * 0.2
+        const x = s / 2 + Math.cos(a) * d
+        const y = s / 2 + Math.sin(a) * d
+        const rad = s * (0.18 + r() * 0.16)
+        const shade = Math.round(255 * (0.55 + 0.45 * (1 - y / s)))
+        const g = ctx.createRadialGradient(x, y, 0, x, y, rad)
+        g.addColorStop(0, `rgba(${shade},${shade},${shade},0.32)`)
+        g.addColorStop(1, `rgba(${shade},${shade},${shade},0)`)
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, s, s)
+      }
+    })
+    t.colorSpace = THREE.NoColorSpace
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
+    return t
+  },
+  /** Radial glow dot (white, alpha falloff) for halos and light cones. */
+  glowDot(): THREE.Texture {
+    const t = canvasTexture('glowDot', 64, (ctx, s) => {
+      const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2)
+      g.addColorStop(0, 'rgba(255,255,255,1)')
+      g.addColorStop(0.25, 'rgba(255,255,255,0.55)')
+      g.addColorStop(0.6, 'rgba(255,255,255,0.12)')
+      g.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.clearRect(0, 0, s, s)
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, s, s)
+    })
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
+    return t
+  },
 }
 
 type StdOpts = THREE.MeshStandardMaterialParameters
@@ -190,6 +403,16 @@ export const mats = {
   emissiveAmber: () => std('emissiveAmber', { color: '#ffb23f', emissive: '#ffb23f', emissiveIntensity: 1.8, roughness: 0.5 }),
   emissiveBlue: () => std('emissiveBlue', { color: '#6fc8ff', emissive: '#6fc8ff', emissiveIntensity: 1.8, roughness: 0.5 }),
   emissiveCream: () => std('emissiveCream', { color: '#fff3d6', emissive: '#fff3d6', emissiveIntensity: 1.4, roughness: 0.5 }),
+  // ---- added by the environment module -----------------------------------
+  /** Corrugated sheet metal (normal-mapped ribs). Clone and set normalMap.repeat for large panels. */
+  corrugatedSteel: () =>
+    std('corrugatedSteel', { color: PALETTE.steel, normalMap: textures.corrugatedNormal(), roughness: 0.5, metalness: 0.55 }),
+  /** Running-bond brick. */
+  brickWall: () => std('brickWall', { color: PALETTE.brick, map: textures.brick(), roughness: 0.9, metalness: 0.02 }),
+  /** Warm lit window (unlit, glows without lights). */
+  windowLit: () => memo('windowLit', () => new THREE.MeshBasicMaterial({ map: textures.dustyWindow(), color: '#ffffff' })),
+  /** Unlit warm lamp lens. */
+  lampLens: () => memo('lampLens', () => new THREE.MeshBasicMaterial({ color: new THREE.Color('#FFE4B5').multiplyScalar(2.2) })),
 }
 
 /** A cached flat-color standard material for one-off accents (keyed by color+params). */

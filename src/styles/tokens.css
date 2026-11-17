@@ -1,32 +1,47 @@
-/* Design tokens — industrial HMI / stamped-label look. Owner: ui module (may extend). */
+/*
+ * Design tokens: industrial HMI / stamped-label look. Owner: ui module.
+ * Text/background pairs used by the UI are contrast-checked in src/ui/lib/contrast.test.ts
+ * (keep them in sync when changing colours).
+ */
 :root {
-  /* palette */
+  /* palette (spec §2) */
   --c-charcoal: #252b2b;
   --c-gunmetal: #465356;
   --c-concrete: #85857d;
   --c-rust: #a95e39;
   --c-hazard: #e9b63f;
+  --c-hazard-dark: #9c7419;
   --c-safety: #e57d35;
   --c-furnace: #ffb05a;
   --c-teal: #638c88;
   --c-cream: #eae3d2;
   --c-soot: #1a1e1f;
   --c-paper: #f3ecdc;
+  --c-paper-2: #e9dfc8;
+  --c-paper-edge: #c4b694;
   --c-paper-ink: #2a2622;
+  --c-paper-dim: #5c5348;
   --c-signal-red: #d9483b;
   --c-signal-green: #5dbb63;
-  --c-link: #2f6f86;
+  --c-stamp-red: #a8382c;
+  --c-link: #245d72;
   --c-link-on-dark: #9fd4e0;
 
   /* semantic */
   --bg: var(--c-charcoal);
   --fg: var(--c-cream);
-  --hmi-bg: rgba(26, 30, 31, 0.92);
-  --hmi-border: #5b686a;
+  --hmi-bg: #1a1e1f;
+  --hmi-bg-2: #222829;
+  --hmi-plate: #2a3133;
+  --hmi-border: #4f5c5e;
   --hmi-fg: #e9e4d6;
   --hmi-dim: #aab3b1;
+  /* HUD plates drawn over the 3D scene: opaque enough that text keeps >= 4.5:1 over a white sky */
+  --hmi-glass: rgba(20, 24, 25, 0.88);
   --accent: var(--c-hazard);
   --focus: #ffd166;
+  --focus-on-paper: #1f5466;
+  --hazard-stripes: repeating-linear-gradient(-45deg, var(--c-hazard) 0 10px, #1d2122 10px 20px);
 
   /* type */
   --font-display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
@@ -40,20 +55,42 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+  --gutter: 16px;
   --radius: 4px;
-  --radius-lg: 8px;
-  --shadow-panel: 0 18px 50px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(255, 255, 255, 0.04) inset;
+  --radius-lg: 6px;
+  --shadow-panel: 0 22px 60px rgba(0, 0, 0, 0.6), 0 2px 0 rgba(255, 255, 255, 0.04) inset;
+  --shadow-plate: 0 6px 18px rgba(0, 0, 0, 0.35);
 
-  /* layers */
+  /* layout */
+  --topbar-h: 56px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /*
+   * layers (low → high). The top bar sits above panels and the loading screen so
+   * navigation is always reachable; the fade overlay never hides it.
+   */
   --z-canvas: 0;
-  --z-hud: 10;
-  --z-touch: 20;
-  --z-topbar: 30;
+  --z-touch-zones: 20;
+  --z-hud: 21;
+  --z-touch: 22;
+  --z-fade: 24;
+  /* captions / dialogue / prompt stay readable over a fade (e.g. the whistle during a tackle) */
+  --z-hud-top: 25;
+  --z-loading: 26;
   --z-panel: 50;
+  --z-topbar: 55;
   --z-toast: 60;
-  --z-fade: 70;
-  --z-loading: 80;
 
   /* touch targets */
   --tap: 48px;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --topbar-h: 52px;
+    --gutter: 12px;
+  }
 }

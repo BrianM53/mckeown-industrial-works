@@ -30,3 +30,36 @@ export const PALETTE = {
 } as const
 
 export type PaletteKey = keyof typeof PALETTE
+
+/**
+ * Environment tones (lighting, sky, paint, interiors). Added by the environment
+ * module; other modules may use them for consistency.
+ */
+export const ENV_PALETTE = {
+  sun: '#FFD3A2',
+  skyZenith: '#5C8590',
+  skyMid: '#A8B9B1',
+  skyHorizon: '#EFC08F',
+  haze: '#CDA986',
+  hemiSky: '#A6BEBF',
+  hemiGround: '#76604B',
+  ambient: '#BFA98F',
+  nightZenith: '#0E1522',
+  nightHorizon: '#2A3346',
+  nightHaze: '#262D3B',
+  moon: '#7F93B8',
+  laneWhite: '#E9E3D3',
+  laneYellow: '#E9B63F',
+  walkway: '#4D7A5B',
+  asphalt: '#3D4241',
+  lotAsphalt: '#454948',
+  windowWarm: '#FFCB8C',
+  lampWarm: '#FFE4B5',
+  emergency: '#FF2A1C',
+  wood: '#9A6B43',
+  woodDark: '#664530',
+  foliage: '#557F3D',
+  terracotta: '#B5643C',
+  rubber: '#1C1F20',
+  glassTint: '#8FB4B8',
+} as const
