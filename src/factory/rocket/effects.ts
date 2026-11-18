@@ -34,12 +34,15 @@ const _p2 = new THREE.Vector3()
 const _q = new THREE.Quaternion()
 const _axis = new THREE.Vector3()
 const _m = new THREE.Matrix4()
+const _c = new THREE.Color()
 const WIND_X = 0.85
 const WIND_Z = -0.35
 
 /** Linear colour helpers (pushed as linear RGB). */
 const STEAM = new THREE.Color('#F2EEE6')
-const BILLOW = new THREE.Color('#DCD6CC')
+const BILLOW = new THREE.Color('#D2CBBF')
+/** Base of the billow: warmer, darker (lit by the flame, sooty). */
+const BILLOW_BASE = new THREE.Color('#A79C8E')
 const CONTRAIL = new THREE.Color('#EDE7DD')
 const DARK = new THREE.Color('#4A4642')
 const SOOT = new THREE.Color('#2E2B29')
@@ -54,12 +57,19 @@ function pushSmoke(buf: ParticleBuffer, x: number, y: number, z: number, size: n
 }
 
 /** Spawn-index range [k0, k1] alive at time t for a constant-rate emitter starting at t0. */
-function aliveRange(t: number, t0: number, t1: number, dt: number, life: number): [number, number] {
+const _range = { k0: 1, k1: 0 }
+
+/** (Writes into a shared object: copy k0/k1 out before calling it again.) */
+function aliveRange(t: number, t0: number, t1: number, dt: number, life: number): { k0: number; k1: number } {
   const tc = Math.min(t, t1)
-  if (tc < t0) return [1, 0]
-  const k1 = Math.floor((tc - t0) / dt)
-  const k0 = Math.max(0, Math.ceil((t - life - t0) / dt))
-  return [k0, k1]
+  if (tc < t0) {
+    _range.k0 = 1
+    _range.k1 = 0
+    return _range
+  }
+  _range.k1 = Math.floor((tc - t0) / dt)
+  _range.k0 = Math.max(0, Math.ceil((t - life - t0) / dt))
+  return _range
 }
 
 // ---------------------------------------------------------------------------
@@ -68,9 +78,9 @@ function aliveRange(t: number, t0: number, t1: number, dt: number, life: number)
 
 /** Piecewise-constant rates (per second) starting at T_IGNITION. */
 const BILLOW_RATES: [number, number][] = [
-  [0, 15],
-  [1.6, 8.5],
-  [4.2, 3.2],
+  [0, 19],
+  [1.6, 10.5],
+  [4.2, 3.6],
   [9, 0],
 ]
 
@@ -137,9 +147,11 @@ function ignitionBillow(f: FxFrame, smoke: ParticleBuffer): void {
     }
     x += WIND_X * a * a * 0.12
     z += WIND_Z * a * a * 0.12
-    const size = 1.8 + 5.6 * (1 - Math.exp(-a / 1.6)) * (0.8 + 0.4 * h3)
-    const alpha = 0.62 * smoothstep(0, 0.07, u) * (1 - u) * (1 - u * 0.4)
-    if (!pushSmoke(smoke, x, y, z, size, alpha, h1 * 6.28 + a * (h2 - 0.5) * 0.6, BILLOW, f.light)) return
+    const size = 2.0 + 6.4 * (1 - Math.exp(-a / 1.5)) * (0.8 + 0.4 * h3)
+    // dense and sooty while young (pooled at the pad), paler as it rises
+    const alpha = 0.8 * smoothstep(0, 0.06, u) * (1 - u) * (1 - u * 0.3)
+    _c.copy(BILLOW_BASE).lerp(BILLOW, smoothstep(0.05, 0.45, u))
+    if (!pushSmoke(smoke, x, y, z, size, alpha, h1 * 6.28 + a * (h2 - 0.5) * 0.6, _c, f.light)) return
   }
 }
 
@@ -161,7 +173,7 @@ function countdownSteam(f: FxFrame, smoke: ParticleBuffer): void {
     const ox = _p.x - _p2.x
     const oz = _p.z - _p2.z
     const ol = Math.hypot(ox, oz) || 1
-    const [k0, k1] = aliveRange(f.T, t0 + v * 0.05, t1, dt, life)
+    const { k0, k1 } = aliveRange(f.T, t0 + v * 0.05, t1, dt, life)
     for (let k = k1; k >= k0; k--) {
       const a = f.T - (t0 + v * 0.05 + k * dt)
       if (a < 0) continue
@@ -185,9 +197,9 @@ function contrail(f: FxFrame, smoke: ParticleBuffer): void {
   const tau = f.T - T_LIFTOFF
   if (tau < 0) return
   const end = Math.min(12, plan.intactUntil)
-  const dt = 0.085 / f.q.smoke
+  const dt = 0.072 / f.q.smoke
   const life = 5.2
-  const [k0, k1] = aliveRange(tau, 0, end, dt, life)
+  const { k0, k1 } = aliveRange(tau, 0, end, dt, life)
   const nz = m.nozzles[0]
   for (let k = k1; k >= k0; k--) {
     const ts = k * dt
@@ -211,7 +223,8 @@ function contrail(f: FxFrame, smoke: ParticleBuffer): void {
       z += Math.sin(ang) * spread
       y = 1.2
     }
-    const size = (0.9 + 3.6 * Math.sqrt(u)) * (0.85 + 0.3 * h)
+    // young puffs start fat enough to overlap even when the rocket is fast
+    const size = (1.5 + 3.4 * Math.sqrt(u)) * (0.85 + 0.3 * h)
     const alpha = 0.5 * smoothstep(0, 0.06, u) * (1 - u) * (0.6 + 0.4 * thrust)
     if (!pushSmoke(smoke, x, y, z, size, alpha, h * 6.28, CONTRAIL, f.light)) return
   }
@@ -225,7 +238,7 @@ function pieceTrails(f: FxFrame, smoke: ParticleBuffer, tracks: PieceTrack[], ma
     const tr = tracks[i]
     const t = tau - tr.t0
     if (t < 0 || t > tr.tLand + life) continue
-    const [k0, k1] = aliveRange(t, 0, tr.tLand, dt, life)
+    const { k0, k1 } = aliveRange(t, 0, tr.tLand, dt, life)
     for (let k = k1; k >= k0; k--) {
       const ts = k * dt
       const a = t - ts
@@ -301,7 +314,7 @@ function smoulder(f: FxFrame, smoke: ParticleBuffer): void {
     if (!tr) continue
     const start = tr.t0 + tr.tRest
     const stop = tr.poofAt !== null ? tr.t0 + tr.poofAt : TAU_CLEANUP
-    const [k0, k1] = aliveRange(tau, start, stop, dt, life)
+    const { k0, k1 } = aliveRange(tau, start, stop, dt, life)
     for (let k = k1; k >= k0; k--) {
       const a = tau - (start + k * dt)
       if (a < 0) continue
@@ -373,7 +386,7 @@ function engineFire(f: FxFrame, glow: ParticleBuffer): void {
   for (let nI = 0; nI < m.nozzles.length; nI++) {
     const nz = m.nozzles[nI]
     _p.set(nz.pos[0], nz.pos[1], nz.pos[2]).applyMatrix4(_m)
-    const [k0, k1] = aliveRange(t, nI * 0.007, 1e9, dt, life)
+    const { k0, k1 } = aliveRange(t, nI * 0.007, 1e9, dt, life)
     const big = nz.radius / 0.8
     for (let k = k1; k >= k0; k--) {
       const a = t - (nI * 0.007 + k * dt)
@@ -454,7 +467,7 @@ function weldSparks(f: FxFrame, glow: ParticleBuffer): void {
   for (let e = 0; e < f.sparks.length; e++) {
     const s = f.sparks[e]
     if (!s.on) continue
-    const [k0, k1] = aliveRange(f.simT, 0, 1e12, dt, life)
+    const { k0, k1 } = aliveRange(f.simT, 0, 1e12, dt, life)
     for (let k = k1; k >= k0; k--) {
       const a = f.simT - k * dt
       if (a < 0) continue
@@ -472,6 +485,15 @@ function weldSparks(f: FxFrame, glow: ParticleBuffer): void {
   }
 }
 
+const _single: PieceTrack[] = []
+
+/** A reused one-element list (no per-frame array allocation). */
+function single(tr: PieceTrack): PieceTrack[] {
+  _single.length = 1
+  _single[0] = tr
+  return _single
+}
+
 /** Write every effect for this frame (smoke first by priority, then glow). */
 export function writeEffects(f: FxFrame, smoke: ParticleBuffer, glow: ParticleBuffer): void {
   const T = f.T
@@ -482,8 +504,8 @@ export function writeEffects(f: FxFrame, smoke: ParticleBuffer, glow: ParticleBu
     explosionSmoke(f, smoke)
     if (f.plan) {
       pieceTrails(f, smoke, f.plan.chunks, 6, 1234)
-      pieceTrails(f, smoke, f.plan.fin ? [f.plan.fin] : [], 1, 2345)
-      if (f.plan.hero) pieceTrails(f, smoke, [f.plan.hero], 1, 3456)
+      if (f.plan.fin) pieceTrails(f, smoke, single(f.plan.fin), 1, 2345)
+      if (f.plan.hero) pieceTrails(f, smoke, single(f.plan.hero), 1, 3456)
     }
     breakupAndDebrisPuffs(f, smoke)
     smoulder(f, smoke)

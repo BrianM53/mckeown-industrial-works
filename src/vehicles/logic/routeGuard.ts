@@ -3,6 +3,8 @@
  * (unit-tested):
  *  - unoccupied and parked in a building door span, or on a straight segment
  *    between linked nav waypoints, for > 30 s → returned to the bay;
+ *  - unoccupied inside a restricted zone (blast zone, transformer yard, wet
+ *    paint — e.g. abandoned there by an OSHA tackle) for > 10 s → returned;
  *  - unoccupied away from home for > 3 min → returned;
  *  - unoccupied and on its side for > 8 s → set back on its wheels in place.
  */
@@ -10,6 +12,7 @@ import type { Rect, Vec2 } from '@/core/types'
 import { WAYPOINTS, ZONE_LIST, type ZoneId } from '@/world/layout'
 import { HOME, ROUTE_GUARD } from '../constants'
 import { footprintCorners, polygonOverlapsRect, polygonSegmentDistance, type Pose2 } from './geometry2d'
+import { footprintInRestricted } from './safePosition'
 import { wrapAngle } from '@/core/math'
 
 export interface DoorZone {
@@ -93,11 +96,13 @@ export class RouteGuard {
   blockingFor = 0
   idleFor = 0
   overturnedFor = 0
+  restrictedFor = 0
   /** Why the last 'return' fired. */
-  reason: 'door' | 'waypoint' | 'idle' | null = null
+  reason: 'door' | 'waypoint' | 'restricted' | 'idle' | null = null
   private retry = 0
   private checkTimer = 0
   private blocking: 'door' | 'waypoint' | null = null
+  private restricted = false
 
   constructor(private readonly cfg = ROUTE_GUARD) {}
 
@@ -126,17 +131,26 @@ export class RouteGuard {
     if (isAtHome(s)) {
       this.blockingFor = 0
       this.idleFor = 0
+      this.restrictedFor = 0
       this.blocking = null
+      this.restricted = false
       return null
     }
     this.checkTimer -= dt
     if (this.checkTimer <= 0) {
       this.checkTimer = 0.25
       this.blocking = blockedDoor(s) ? 'door' : blockedSegment(s) ? 'waypoint' : null
+      this.restricted = footprintInRestricted(s)
     }
     this.blockingFor = this.blocking ? this.blockingFor + dt : 0
+    this.restrictedFor = this.restricted ? this.restrictedFor + dt : 0
     this.idleFor += dt
     if (this.retry > 0) return null
+    if (this.restricted && this.restrictedFor >= this.cfg.restrictedAfter) {
+      this.reason = 'restricted'
+      this.retry = this.cfg.retryAfter
+      return 'return'
+    }
     if (this.blocking && this.blockingFor >= this.cfg.blockingAfter) {
       this.reason = this.blocking
       // fire once, then back off until done() / the retry interval elapses
@@ -166,7 +180,9 @@ export class RouteGuard {
     this.blockingFor = 0
     this.idleFor = 0
     this.overturnedFor = 0
+    this.restrictedFor = 0
     this.blocking = null
+    this.restricted = false
     this.checkTimer = 0
   }
 }

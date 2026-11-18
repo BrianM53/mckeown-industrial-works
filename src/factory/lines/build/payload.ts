@@ -148,10 +148,18 @@ export function buildPayload(k: Kit): PayloadAnimator {
   const len = Math.hypot(hlen, dy)
   const yaw = Math.atan2(-dx, -dz)
   const pitch = Math.atan2(dy, hlen)
-  b.frame((ax0 + bx0) / 2, (ay0 + by0) / 2 - 0.42, (az0 + bz0) / 2, yaw, () => {
+  const cx = (ax0 + bx0) / 2
+  const cy = (ay0 + by0) / 2 - 0.42
+  const cz = (az0 + bz0) / 2
+  b.frame(cx, cy, cz, yaw, () => {
     b.box([0, 0, 0], [0.82, 0.05, len], yellow)
     for (const s of [-1, 1]) b.box([s * 0.42, 0.13, 0], [0.04, 0.3, len], yellow)
-    b.box([0, -0.05, 0], [0.1, 0.06, len - 0.2], dark)
+    // dark pan + cross ribs underneath: from the aisle it reads as a steel chute, not a plank
+    b.box([0, -0.06, 0], [0.88, 0.07, len - 0.04], dark)
+    for (let i = 0; i < 4; i++) b.box([0, -0.13, -len / 2 + 0.3 + (i * (len - 0.6)) / 3], [0.92, 0.07, 0.09], dark)
+  }, pitch)
+  k.hazard.frame(cx, cy, cz, yaw, () => {
+    for (const s of [-1, 1]) k.hazard.box([s * 0.445, 0.19, 0], [0.012, 0.13, len - 0.12], st.white)
   }, pitch)
   b.cyl([ARCH.legX - 0.2, 3.1, az0 + 0.15], [(ax0 + bx0) / 2 + 0.3, (ay0 + by0) / 2 - 0.5, (az0 + bz0) / 2], 0.05, dark, 6)
   b.cyl([ax0 - 0.1, ay0 - 0.35, az0], [0.6, ry - ARCH.ringR - 0.05, az], 0.04, dark, 6)
@@ -198,7 +206,8 @@ export function buildPayload(k: Kit): PayloadAnimator {
   k.hazard.box([0, T.y0 + 0.05, T.z1 + 0.02], [T.halfW * 2, 0.1, 0.04], st.white)
 
   // ---------------------------------------------------------------- animation + gameplay
-  const monitor = new QcArchMonitor(ARCH.z, ARCH.detectHalfW, { beepGap: 1.2, toastGap: 60 })
+  // maxStep 2.5 m: tolerant of low-fps frames, still ignores fast travel / respawn jumps
+  const monitor = new QcArchMonitor(ARCH.z, ARCH.detectHalfW, { beepGap: 1.2, toastGap: 60, maxStep: 2.5 })
   const falling: Falling[] = []
   const resting: Array<{ slot: number; cycle: number }> = []
   let nextSlot = 0
@@ -207,7 +216,8 @@ export function buildPayload(k: Kit): PayloadAnimator {
   let triggers = 0
   let toasts = 0
   let dropped = 0
-  let lastT = 0
+  /** Visitor-facing clock (accumulated frame time): a sim reset / debug advance never re-arms or blocks the toast. */
+  let wallT = 0
   const rejects: RejectState = { poses: Array.from({ length: 8 }, () => ({ x: 0, y: 0, z: 0, rx: 0, rz: 0 })), cycles: new Array(8).fill(0), count: 0 }
   const podY = RY - POD.hang
   const tmp: RejectPose = { x: 0, y: 0, z: 0, rx: 0, rz: 0 }
@@ -234,7 +244,7 @@ export function buildPayload(k: Kit): PayloadAnimator {
     rejects,
     debugReject: () => startReject(Math.floor(Math.random() * 1000)),
     debugVisitor: () => {
-      visitorPass(lastT, true)
+      visitorPass(wallT, true)
       events.emit('sfx', { name: 'scanner-beep', position: beep })
     },
     stats: () => ({ triggers, toasts, rejectsDropped: dropped }),
@@ -242,13 +252,13 @@ export function buildPayload(k: Kit): PayloadAnimator {
       const L = f.s.lines.payload
       const fx = f.fx
       const t = f.t
-      lastT = t
+      wallT += f.dt
       // visitor through the arch (feet crossing z = ARCH.z inside the opening)
       const p = runtime.player.position
       const onFoot = runtime.player.mode === 'foot'
-      const r = monitor.step(p.x, p.z, onFoot, t)
+      const r = monitor.step(p.x, p.z, onFoot, wallT)
       if (r.pass) {
-        visitorPass(t, r.toast)
+        visitorPass(wallT, r.toast)
         if (r.beep) fx.sfx('scanner-beep', beep)
       }
       // caught payload defect → a pod drops into the reject bin
@@ -283,12 +293,12 @@ export function buildPayload(k: Kit): PayloadAnimator {
       rejects.count = n
 
       // arch state colors: green scanning, amber while the line waits, red on a reject
-      const visitorHot = t - visitorT < 2.5
+      const visitorHot = wallT - visitorT < 2.5
       const hot = visitorHot || L.defectFlash > 0
       const blink = f.reduced ? 1 : Math.sin(t * 16) > 0 ? 1 : 0.35
       if (hot) fx.chan[CH.ARCH].set(2.6 * blink, 0.25 * blink, 0.2 * blink)
       else if (L.status === 'blocked') fx.chan[CH.ARCH].set(2.2, 1.2, 0.2)
-      else fx.chan[CH.ARCH].set(0.45, 2.1, 1.1)
+      else fx.chan[CH.ARCH].set(0.18, 1.15, 0.55)
       fx.chan[CH.REJECT].set(hot ? 2.4 * blink : 0.12, hot ? 0.35 * blink : 0.05, hot ? 0.3 * blink : 0.05)
       for (const bi of beacons) fx.lamps.light(bi, hot ? LAMP.red : L.status === 'blocked' ? LAMP.amber : LAMP.green, hot ? blink : 0.8)
       // scanner motion (from sim time → deterministic)
@@ -296,8 +306,8 @@ export function buildPayload(k: Kit): PayloadAnimator {
       const sy = 0.25 + 4.0 * (0.5 - 0.5 * Math.cos(t * sweep))
       rig.pose(scan, 0, 0, 0, 0, sy - 0.3, 0)
       rig.pose(rotor, 0, 0, t * (f.reduced ? 0.6 : 1.8))
-      const band = hot ? [0.5, 0.06, 0.05] : [0.1, 0.42, 0.26]
-      fx.fxChan[FX.SCAN].set(band[0], band[1], band[2])
+      if (hot) fx.fxChan[FX.SCAN].set(0.5, 0.06, 0.05)
+      else fx.fxChan[FX.SCAN].set(0.1, 0.42, 0.26)
       // ring glow while a pod passes through it
       let near = 9
       for (let i = 0; i < L.items.length; i++) near = Math.min(near, Math.abs(zAt(line, L.items[i]) - ARCH.z))

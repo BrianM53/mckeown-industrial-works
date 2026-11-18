@@ -165,11 +165,42 @@ describe('Night Shift FSM', () => {
     h.off() // the sim clock stops ticking the FSM (paused tab, broken frame loop...)
     expect(h.lighting.level).toBeLessThan(0.5)
     expect(h.fsm.watchdog()).toBe(false)
-    h.addReal(NIGHT.watchdogMaxActive + 1)
+    h.addReal(NIGHT.watchdogStall - 1)
+    expect(h.fsm.watchdog()).toBe(false) // a hiccup is not a stall
+    h.addReal(2)
     expect(h.fsm.watchdog()).toBe(true)
     expect(h.lighting).toEqual({ level: 1, emergency: 0 })
     expect(h.fsm.phase).toBe('cooldown')
     expect(h.count('nightshift:end')).toBe(1)
+    expect(h.director.exclusiveActive()).toBeNull()
+  })
+
+  it('watchdog: a slow clock (low fps, sim at 0.25× real time) is not cut short', () => {
+    const h = setup()
+    h.fsm.start()
+    let interventions = 0
+    // the harness adds dt of real time per tick; add 3 dt more → real runs 4× faster than sim
+    h.run(NIGHT.powerDown + NIGHT.blackout + NIGHT.restore + 1, () => {
+      h.addReal(STEP * 3)
+      if (h.fsm.watchdog()) interventions++
+    })
+    expect(interventions).toBe(0)
+    expect(h.phases.map((p) => p.p)).toEqual(['powerDown', 'blackout', 'restore', 'cooldown'])
+    expect(h.lighting).toEqual({ level: 1, emergency: 0 })
+  })
+
+  it('watchdog: an FSM that stops being ticked while sim time runs on is restored', () => {
+    const h = setup()
+    h.fsm.start()
+    h.run(4)
+    h.off() // lost its simClock subscription, but the clock keeps going
+    expect(h.lighting.level).toBeLessThan(0.5)
+    h.clock.advance(NIGHT.powerDown + NIGHT.blackout + NIGHT.restore - 4 + NIGHT.watchdogSimMargin - 0.5)
+    expect(h.fsm.watchdog()).toBe(false) // still within its expected length + margin
+    h.clock.advance(1)
+    expect(h.fsm.watchdog()).toBe(true)
+    expect(h.lighting).toEqual({ level: 1, emergency: 0 })
+    expect(h.fsm.phase).toBe('cooldown')
     expect(h.director.exclusiveActive()).toBeNull()
   })
 

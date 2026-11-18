@@ -15,7 +15,7 @@ import { Builder } from '../lib/builder'
 import { type AtlasItem, buildAtlas, canvasTexture, fitText, makeCanvas, rivets, roundRect, type Ctx } from '../lib/canvas'
 import { C } from '../lib/materials'
 import { BuiltMeshes, StaticColliders, useBuilt, type BoxCol, type CylCol } from '../lib/react'
-import { drawScreen, type ScreenKind } from './screens'
+import { drawScreen, type ScreenData, type ScreenKind } from './screens'
 import { EventLog, PHASE_LABEL, Telemetry, describeEvent } from './telemetry'
 
 /**
@@ -430,6 +430,7 @@ export function ControlRoom({ shadows, lowTier }: { shadows: boolean; lowTier: b
   }, [log])
 
   const st = useRef({ acc: 10, time: 0, drawn: false })
+  const screenData = useMemo<ScreenData>(() => ({ s: factory.state, tel, log, time: 0, blackout: false }), [tel, log])
 
   useInteractable({
     id: 'station:harmony-console',
@@ -459,7 +460,10 @@ export function ControlRoom({ shadows, lowTier }: { shadows: boolean; lowTier: b
     const blackout = runtime.lighting.level < 0.55
     ctx.save()
     ctx.setTransform(screens.scale, 0, 0, screens.scale, 0, 0)
-    const data = { s: factory.state, tel, log, time: reducedRef.current ? Math.floor(k.time / 2) * 2 : k.time, blackout }
+    const data = screenData
+    data.s = factory.state
+    data.time = reducedRef.current ? Math.floor(k.time / 2) * 2 : k.time
+    data.blackout = blackout
     for (const slot of SLOTS) drawScreen(ctx, slot.kind, slot.px[0], slot.px[1], slot.px[2], slot.px[3], data)
     ctx.restore()
     screens.tex.needsUpdate = true
@@ -480,7 +484,7 @@ export function ControlRoom({ shadows, lowTier }: { shadows: boolean; lowTier: b
     const p = runtime.player.position
     const d = Math.hypot(p.x - OPERATOR.x, p.z - OPERATOR.z)
     if (d > 5.5) return 0
-    return wrapAngle(yawToward({ x: OPERATOR.x, z: OPERATOR.z }, { x: p.x, z: p.z }) - OPERATOR.yaw)
+    return wrapAngle(yawToward(OPERATOR, p) - OPERATOR.yaw)
   }
 
   return (

@@ -4,7 +4,7 @@ import * as THREE from 'three'
 
 /**
  * Pooled cartoon puffs (exhaust smoke, recovery / return "poof", crash dust):
- * chunky faceted blobs that swell and shrink (no transparency sorting), ONE
+ * chunky faceted, slightly see-through blobs that swell and shrink, ONE
  * instanced draw call, fixed capacity, nothing allocated per frame.
  */
 export interface PuffOpts {
@@ -173,7 +173,21 @@ let puffMat: THREE.MeshStandardMaterial | null = null
 export function usePuffPool(capacity = 64): PuffPool {
   const pool = useMemo(() => {
     if (!puffGeo) puffGeo = new THREE.IcosahedronGeometry(1, 1)
-    if (!puffMat) puffMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, metalness: 0, flatShading: true, name: 'vehicles:puffs' })
+    // slightly see-through with a little self-light, so puffs read as soft dust /
+    // smoke rather than grey rocks (no depth write: no sorting artefacts between them)
+    if (!puffMat)
+      puffMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        emissive: '#FFF6E8',
+        emissiveIntensity: 0.16,
+        roughness: 1,
+        metalness: 0,
+        flatShading: true,
+        transparent: true,
+        opacity: 0.78,
+        depthWrite: false,
+        name: 'vehicles:puffs',
+      })
     return new PuffPool(capacity, puffGeo, puffMat)
   }, [capacity])
   useEffect(

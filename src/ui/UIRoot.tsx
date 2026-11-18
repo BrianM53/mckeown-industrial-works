@@ -188,6 +188,8 @@ function useUIEffects(mode: UIMode): void {
         setRecoveryHint: (text: string | null) => useUIStore.getState().setRecoveryHint(text),
         setFade: (opacity: number, label?: string) => useUIStore.getState().setFade({ opacity, label }),
         setRouteTarget: (zoneId: string | null) => useUIStore.getState().setRouteTarget(zoneId),
+        // Re-show (true) or dismiss (false) the spawn controls hint; showing restarts its ~9 s timer.
+        setControlsHint: (visible: boolean) => useUIStore.getState().setControlsHintVisible(!!visible),
       }),
     [],
   )

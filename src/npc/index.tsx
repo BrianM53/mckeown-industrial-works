@@ -6,7 +6,7 @@
  * occasional speech-bubble chatter.
  *
  * Debug (dev/test builds): __MIW__.npc.{list, positions, triggerGag, gags, talk,
- * emit, validation, snap}.
+ * wave, emit, validation, snap, roster}.
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useRapier } from '@react-three/rapier'
@@ -60,6 +60,8 @@ export default function NpcModule() {
         /** Emit a game event (simulate nightshift:start, rocket:outcome… for visual checks). */
         emit: <K extends GameEventName>(name: K, payload?: GameEvents[K]) => events.emit(name, (payload ?? {}) as GameEvents[K]),
         validation: () => world.validation,
+        /** Make an NPC wave at the visitor now (Dot's greeting). */
+        wave: (id: string) => world.brains.get(id)?.greet(),
         /** Teleport an NPC to one of its stations. */
         snap: (id: string, station: string) => world.brains.get(id)?.snapTo(station),
         roster: () => ROSTER.map((d) => ({ id: d.id, name: d.name, role: d.role, tier: d.tier })),

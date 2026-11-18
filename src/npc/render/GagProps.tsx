@@ -632,23 +632,24 @@ function RobotArm({ props, shadows }: { props: PropStates; shadows: boolean }) {
 // Static colliders for every solid prop (jacks switch off while moving)
 // ===========================================================================
 
+/** A parked jack is solid; while it rolls (standoff gag) its parking collider switches off. */
+function syncJackCollider(c: RapierCollider | null, moving: boolean, s: { a: boolean; b: boolean }, key: 'a' | 'b'): void {
+  if (!c || s[key] === !moving) return
+  try {
+    c.setEnabled(!moving)
+    s[key] = !moving
+  } catch {
+    /* not ready */
+  }
+}
+
 function PropColliders({ props }: { props: PropStates }) {
   const ja = useRef<RapierCollider>(null)
   const jb = useRef<RapierCollider>(null)
   const state = useRef({ a: true, b: true })
   useFrame(() => {
-    const s = state.current
-    const want = (c: RapierCollider | null, moving: boolean, key: 'a' | 'b') => {
-      if (!c || s[key] === !moving) return
-      try {
-        c.setEnabled(!moving)
-        s[key] = !moving
-      } catch {
-        /* not ready */
-      }
-    }
-    want(ja.current, props.jackA.moving, 'a')
-    want(jb.current, props.jackB.moving, 'b')
+    syncJackCollider(ja.current, props.jackA.moving, state.current, 'a')
+    syncJackCollider(jb.current, props.jackB.moving, state.current, 'b')
   })
   const half = JACK_SIZE.length / 2
   const hw = JACK_SIZE.width / 2

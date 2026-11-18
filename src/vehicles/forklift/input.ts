@@ -53,7 +53,8 @@ export class DriveInput {
   private held = new Map<string, Axis>()
   /** Codes that were already down when we sat in: ignored until released. */
   private suppressed = new Set<string>()
-  private test: { throttle: number; steer: number; until: number } | null = null
+  /** Programmatic drive (tests): counts down in PHYSICS time, so it is frame-rate independent. */
+  private test: { throttle: number; steer: number; left: number } | null = null
   /** Called on a horn press (H / Space / touch button). */
   onHorn: (() => void) | null = null
   /** Is somebody driving? Horn & Space capture only then. */
@@ -89,12 +90,24 @@ export class DriveInput {
     const t = Number.isFinite(throttle) ? Math.max(-1, Math.min(1, throttle)) : 0
     const s = Number.isFinite(steer) ? Math.max(-1, Math.min(1, steer)) : 0
     const dur = Number.isFinite(ms) ? Math.max(0, ms) : 1000
-    this.test = dur > 0 ? { throttle: t, steer: s, until: now() + dur } : null
+    this.test = dur > 0 ? { throttle: t, steer: s, left: dur / 1000 } : null
+  }
+
+  /** Advance the programmatic drive by one physics step. */
+  advance(dt: number): void {
+    if (!this.test) return
+    this.test.left -= dt
+    // (tolerance: 30 steps of 1/60 s must make exactly 500 ms)
+    if (!(this.test.left > 1e-6)) this.test = null
   }
 
   get testActive(): boolean {
-    if (this.test && now() > this.test.until) this.test = null
     return this.test !== null
+  }
+
+  /** Seconds of programmatic driving left (physics time). */
+  get testLeft(): number {
+    return this.test ? Math.max(0, this.test.left) : 0
   }
 
   /** Current intent. `driving` false → zero (unless a test drive is running). */
@@ -166,8 +179,4 @@ export class DriveInput {
   private onVisibility = (): void => {
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') this.clear()
   }
-}
-
-function now(): number {
-  return typeof performance !== 'undefined' ? performance.now() : Date.now()
 }

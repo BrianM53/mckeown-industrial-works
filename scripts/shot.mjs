@@ -100,8 +100,10 @@ for (const s of shots) {
       }
     }
     await page.waitForTimeout(s.wait ?? 1200)
+    // Let two more frames render (HTML entrance animations, late canvas frames) before capturing.
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))))).catch(() => {})
     mkdirSync(dirname(s.out), { recursive: true })
-    await page.screenshot({ path: s.out })
+    await page.screenshot({ path: s.out, timeout })
     const state = await page.evaluate(() => ({
       player: window.__MIW__?.player?.getState?.(),
       camera: window.__MIW__?.camera?.getState?.(),

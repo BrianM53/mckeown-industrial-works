@@ -146,6 +146,10 @@ interface Emitter extends CullItem {
 
 const NOOP_HANDLE: LoopHandle = { setVolume() {}, setRate() {}, setPosition() {}, stop() {} }
 
+/** Realization priority: non-positional beds (music, ambience) first, then nearest first. */
+const realizeKey = (e: Emitter) => (!e.positional ? -1 : Number.isFinite(e.distance) ? e.distance : Number.MAX_VALUE)
+const byRealizeOrder = (a: Emitter, b: Emitter) => realizeKey(a) - realizeKey(b)
+
 function defaultCreateContext(): AudioContext | null {
   if (typeof window === 'undefined') return null
   const w = globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
@@ -624,7 +628,9 @@ export class AudioEngine {
     // audibility at the listener: the normalized peak (not the raw synth gain) × volume × distance × walls
     const loud = voiceLoudness(meta.peakDb, volume, distGain, occ.gain)
     const score = loud * meta.priority
-    const adm = admitVoice(this.voices, this.maxVoices(), { name, score, perNameCap: meta.maxVoices, policy: meta.onLimit })
+    // Interface feedback is never refused for being quiet: in a full pool it replaces the least audible voice.
+    const admitScore = meta.ui ? Number.POSITIVE_INFINITY : score
+    const adm = admitVoice(this.voices, this.maxVoices(), { name, score: admitScore, perNameCap: meta.maxVoices, policy: meta.onLimit })
     if (!adm.admit) {
       this.dropped.rejected++
       return
@@ -947,6 +953,8 @@ export class AudioEngine {
     const list = this.tickList
     list.length = 0
     for (const e of this.emitters) list.push(e)
+    // realization is budgeted: beds first, then the nearest emitters (after a teleport the closest sound comes first)
+    list.sort(byRealizeOrder)
     for (const e of list) {
       if (e.want && !e.built) {
         if (!this.warm || budget <= 0) continue
@@ -1149,16 +1157,18 @@ export class AudioEngine {
     for (const e of this.emitters) if (e.built) active++
     const L = [...this.listenerPos()]
     const r3 = (v: number) => Math.round(v * 1000) / 1000
+    // live (not the last applied value): update() only re-applies ducks while the context runs
+    const duck = this.ducks.amount(this.now())
     return {
       contextState,
       consent: this.consent,
       muted: this.muted,
       hidden: this.hidden,
       masterGain: r3(ctx && this.mixer ? this.masterTarget() : 0),
-      musicGain: r3(volumeToGain(this.musicVolume) * (1 - this.duckApplied)),
+      musicGain: r3(volumeToGain(this.musicVolume) * (1 - duck)),
       sfxGain: r3(volumeToGain(this.sfxVolume)),
-      ambienceGain: r3(volumeToGain(this.sfxVolume) * MIX.ambienceRatio * (1 - this.duckApplied * 0.6)),
-      duck: r3(this.duckApplied),
+      ambienceGain: r3(volumeToGain(this.sfxVolume) * MIX.ambienceRatio * (1 - duck * 0.6)),
+      duck: r3(duck),
       focus: r3(this.focus),
       activeVoices: this.voices.length,
       activeLoops: active,

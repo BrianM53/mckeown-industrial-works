@@ -241,8 +241,12 @@ export const NIGHT = {
   startCaption: '⚡ Power failure! Emergency lighting engaged.',
   restorePa: 'Power restored. Whoever pressed the button: we know.',
   restorePaDelay: 0.8,
-  /** Watchdog: an event running longer than this (real seconds) is force-restored. */
-  watchdogMaxActive: 30,
+  /** Watchdog: an event whose sim clock made no progress for this many real seconds is force-restored. */
+  watchdogStall: 20,
+  /** Watchdog: an event still running this many sim seconds after it should have ended is force-restored. */
+  watchdogSimMargin: 4,
+  /** Watchdog: hard real-time cap on one event (a < ~1.5 fps device gets its lights back early). */
+  watchdogMaxActive: 120,
 } as const
 
 export const NIGHT_BUTTON = {
@@ -250,6 +254,10 @@ export const NIGHT_BUTTON = {
   label: 'Night Shift button',
   verb: 'Press',
   jammedToast: 'The Night Shift button is jammed while something else is going on. Try again in a moment.',
+  /** Pressing the locked cover during the blackout. */
+  busyToast: 'It is already dark. That is the button working.',
+  /** Pressing the locked cover while it recharges. */
+  rechargeToast: (s: number) => `Night Shift button recharging: ${s} s. Even emergencies need a coffee break.`,
 } as const
 
 // ---------------------------------------------------------------------------

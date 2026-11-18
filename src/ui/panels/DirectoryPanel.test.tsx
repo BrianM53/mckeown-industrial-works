@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { provideService, type PlayerService } from '@/core/services'
 import { useUIStore } from '@/state/ui'
 import { PRINCIPAL_ZONES, ZONES } from '@/world/layout'
-import { DESTINATIONS } from '../lib/destinations'
+import { contactChannels, DESTINATIONS } from '../lib/destinations'
 import { renderInMode, resetUIState } from '../testing/helpers'
 import DirectoryPanel from './DirectoryPanel'
+import { compassFromSiteCentre, SITE_DESCRIPTION } from './SiteMap'
 
 let removePlayer: (() => void) | null = null
 
@@ -127,5 +128,22 @@ describe('Directory panel', () => {
     expect(map).toHaveAttribute('role', 'img')
     for (const id of PRINCIPAL_ZONES) expect(map).toHaveTextContent(ZONES[id].shortName)
     expect(map).toHaveTextContent('YOU')
+  })
+
+  it('describes the map in text derived from the layout (names and compass directions)', () => {
+    for (const id of PRINCIPAL_ZONES) {
+      const dir = compassFromSiteCentre(ZONES[id].center)
+      expect(SITE_DESCRIPTION).toContain(`${ZONES[id].name} (${ZONES[id].shortName}) ${dir === 'centre' ? 'in the middle' : `to the ${dir}`}`)
+    }
+    expect(compassFromSiteCentre([0, -4])).toBe('centre')
+    expect(compassFromSiteCentre([0, -40])).toBe('north')
+    expect(compassFromSiteCentre([45, -4])).toBe('east')
+    expect(compassFromSiteCentre([-40, 30])).toBe('south-west')
+  })
+
+  it('names only the configured contact channels in the Contact entry', () => {
+    const contact = DESTINATIONS.find((d) => d.key === 'contact')
+    expect(contact?.blurb.startsWith(`${contactChannels()} links.`)).toBe(true)
+    expect(contactChannels()).toMatch(/GitHub/)
   })
 })

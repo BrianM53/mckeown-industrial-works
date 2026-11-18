@@ -6,11 +6,12 @@
  *            the next station ('mount'/'unmount' blend onto props) → 'stay' ...
  * Yielding:  a moving NPC pauses when the visitor (or the forklift) is within
  *            ~1.2 m ahead; after 2 s it sidesteps (if the spot is free), after 6 s
- *            it walks back to the station it came from. It never pushes anyone.
+ *            it walks back to the station it came from; still walled in 8 s later,
+ *            it snaps to its destination. It never pushes anyone.
  * After a gag the NPC walks a validated straight segment back to its station
  * ('return'); if anything is off (non-finite / far away) it snaps there.
  */
-import { clamp, dampAngle, wrapAngle, yawFromDirection, yawToward } from '@/core/math'
+import { clamp, dampAngle, wrapAngle, yawFromDirection } from '@/core/math'
 import type { Vec2 } from '@/core/types'
 import type { WorkerAnim } from '@/world/WorkerModel'
 import { legKey, type CompiledNpc } from './routes'
@@ -39,6 +40,8 @@ export const BRAIN = {
   forkliftSpace: 1.9,
   sidestepAfter: 2,
   reverseAfter: 6,
+  /** After backing off once, still walled in this long (e.g. a parked forklift + the visitor): snap home. */
+  giveUpAfter: 8,
   sidestepDistance: 0.85,
   arriveTolerance: 0.08,
   cornerRadius: 0.3,
@@ -48,6 +51,9 @@ export const BRAIN = {
   greetDistance: 7,
   greetCooldown: 30,
 } as const
+
+/** Yaw from one ground point toward another (allocation-free yawToward). */
+const yawTo = (fx: number, fz: number, tx: number, tz: number): number => yawFromDirection(tx - fx, tz - fz)
 
 const ANIM_FOR_ACTIVITY: Record<StationDef['activity'], WorkerAnim> = {
   idle: 'idle',
@@ -240,6 +246,13 @@ export class NpcBrain {
     this.reversedOnce = false
   }
 
+  /** Wave at the visitor now (debug / screenshots; greeters also turn toward them). */
+  greet(): void {
+    if (this.mode !== 'stay') return
+    this.gesture = 'wave'
+    this.gestureLeft = 1.9
+  }
+
   /** Teleport to a station (debug, recovery). */
   snapTo(stationId: string): void {
     const st = this.c.stations.get(stationId) ?? this.currentStation
@@ -309,7 +322,7 @@ export class NpcBrain {
     this.speed = 0
     const st = this.currentStation
     const seated = this.onPropStation() || this.mode === 'mount' || this.mode === 'unmount'
-    const toPlayer = yawToward({ x: this.x, z: this.z }, env.player)
+    const toPlayer = yawTo(this.x, this.z, env.player.x, env.player.z)
     if (seated) {
       // Nappers sleep-talk; sitters stay seated and look over.
       if (st.activity === 'nap') {
@@ -355,18 +368,23 @@ export class NpcBrain {
         this.anim = seated ? 'sit' : 'cheer'
         break
       case 'dismay':
-        this.anim = seated ? 'sit' : 'point'
+        // slumped shoulders and a slow head shake ("…that was our rocket")
+        this.anim = seated ? 'sit' : 'idle'
+        this.lookYaw = Math.sin(this.time * 7.5 + this.c.def.seed) * 0.42
         break
       case 'watch':
         this.anim = seated ? 'sit' : this.carry ? 'carry' : 'idle'
         break
     }
     if (cur.face && !seated) {
-      const y = yawToward({ x: this.x, z: this.z }, { x: cur.face[0], z: cur.face[1] })
+      const y = yawTo(this.x, this.z, cur.face[0], cur.face[1])
       this.yaw = dampAngle(this.yaw, y, 4, dt)
       this.lookYaw = cur.kind === 'watch' ? 0 : this.lookYaw
     }
-    if (!seated) this.lean = this.lean * Math.exp(-6 * dt)
+    if (!seated) {
+      const slump = cur.kind === 'dismay' ? -0.13 : 0
+      this.lean = slump + (this.lean - slump) * Math.exp(-6 * dt)
+    }
     return true
   }
 
@@ -409,7 +427,7 @@ export class NpcBrain {
 
     // Base facing: the station yaw, or toward the visitor while greeting/glancing.
     let faceYaw = st.yaw
-    if (this.gesture === 'wave' && this.c.def.greeter) faceYaw = yawToward({ x: this.x, z: this.z }, env.player)
+    if (this.gesture === 'wave' && this.c.def.greeter) faceYaw = yawTo(this.x, this.z, env.player.x, env.player.z)
     if (!st.onProp) this.yaw = dampAngle(this.yaw, faceYaw, st.activity === 'lean' ? 6 : 4, dt)
 
     // Occasional gestures at idle stations.
@@ -431,8 +449,8 @@ export class NpcBrain {
 
     // Glances: at the visitor when near, else at the station's point of interest.
     if (st.activity === 'nap') this.lookYaw = null
-    else if (near) this.lookYaw = wrapAngle(yawToward({ x: this.x, z: this.z }, env.player) - this.yaw)
-    else if (st.lookAt) this.lookYaw = wrapAngle(yawToward({ x: this.x, z: this.z }, { x: st.lookAt[0], z: st.lookAt[1] }) - this.yaw)
+    else if (near) this.lookYaw = wrapAngle(yawTo(this.x, this.z, env.player.x, env.player.z) - this.yaw)
+    else if (st.lookAt) this.lookYaw = wrapAngle(yawTo(this.x, this.z, st.lookAt[0], st.lookAt[1]) - this.yaw)
     else this.lookYaw = null
 
     this.stayLeft -= dt
@@ -553,9 +571,10 @@ export class NpcBrain {
       this.blockedFor += dt
       this.speed = Math.max(0, this.speed - dt * 8)
       this.anim = this.carry ? 'carry' : 'idle'
-      if (env.player.active) this.lookYaw = wrapAngle(yawToward({ x: this.x, z: this.z }, env.player) - this.yaw)
+      if (env.player.active) this.lookYaw = wrapAngle(yawTo(this.x, this.z, env.player.x, env.player.z) - this.yaw)
       if (this.blockedFor > BRAIN.sidestepAfter && !this.sidestepped) this.trySidestep(env, dirX, dirZ)
       else if (this.blockedFor > BRAIN.reverseAfter && !this.reversedOnce) this.reverse()
+      else if (this.reversedOnce && this.blockedFor > BRAIN.giveUpAfter) this.snapTo(this.destination ?? this.stationId)
       return
     }
     this.blockedFor = Math.max(0, this.blockedFor - dt * 2)

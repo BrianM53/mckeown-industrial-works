@@ -284,9 +284,14 @@ export function Forklift({ puffs }: { puffs: PuffPool }) {
       sys.exhaust(dt, _p.x, _p.y, _p.z, useGameStore.getState().quality === 'low')
     }
 
-    // ---- the camera may hide the parked forklift when it blocks the view of the worker
+    // ---- the camera may hide the parked forklift when it blocks the view of the
+    // worker; once somebody drives it, it is always shown (the fader only
+    // re-scans its flags every ~2 s, so never wait for it to un-hide us)
     const vis = refs.visual.current
-    if (vis) vis.userData.cameraFade = !occupied
+    if (vis) {
+      vis.userData.cameraFade = !occupied
+      if (occupied && !vis.visible) vis.visible = true
+    }
   })
 
   const lookYaw = useMemo(() => () => anim.current.look, [])
@@ -363,8 +368,9 @@ const ForkliftBody = memo(function ForkliftBody({ bodyRef, refs, beaconMat, halo
       ))}
 
       <object3D ref={refs.anchor} />
-      <instancedMesh ref={refs.wheels} args={[A.wheel, A.rubber, 4]} castShadow={shadows} receiveShadow name="forklift-wheels" />
       <group ref={refs.visual} name="forklift-visual">
+        {/* wheels stay out of the wobble group (the body rocks on its tyres) */}
+        <instancedMesh ref={refs.wheels} args={[A.wheel, A.rubber, 4]} castShadow={shadows} receiveShadow name="forklift-wheels" />
         <group ref={refs.wobble}>
           <mesh geometry={A.body} material={A.paint} castShadow={shadows} receiveShadow />
           <mesh geometry={A.metal} material={A.metalMat} castShadow={shadows} receiveShadow />

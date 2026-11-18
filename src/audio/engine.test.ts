@@ -416,6 +416,33 @@ describe('voices', () => {
     expect(eng.getState().activeVoices).toBe(16)
   })
 
+  it('interface sounds are never refused by a full pool (they replace the least audible voice)', () => {
+    const { eng, consent, clock } = track(setup())
+    eng.acquire()
+    eng.setQuality('low')
+    consent()
+    // fill all 16 voices with loud world sounds (the fake clock never ends them)
+    const loud: SfxName[] = ['press-thump', 'machine-clank', 'machine-kick', 'forklift-impact', 'tackle-thud', 'boing', 'print-stamp', 'forklift-horn']
+    for (let i = 0; eng.getState().activeVoices < 16 && i < 64; i++) {
+      clock.t += 2
+      eng.api.play(loud[i % loud.length])
+    }
+    expect(eng.getState().activeVoices).toBe(16)
+    const before = eng.getState().dropped
+    // a quiet world sound is still refused…
+    clock.t += 2
+    eng.api.play('scanner-beep')
+    expect(eng.getState().dropped.rejected).toBe(before.rejected + 1)
+    // …but the visitor's own UI feedback always plays
+    for (const ui of ['ui-open', 'ui-close', 'ui-click'] as const) {
+      clock.t += 2
+      eng.api.play(ui)
+      expect(eng.getState().lastPlayed.at(-1)).toBe(ui)
+      expect(eng.getState().activeVoices).toBe(16)
+    }
+    expect(eng.getState().dropped.stolen).toBe(before.stolen + 3)
+  })
+
   it('rate limits are per source for positional sounds', () => {
     const { eng, consent } = track(setup())
     eng.acquire()
@@ -542,6 +569,27 @@ describe('loops and spatial culling', () => {
     expect(eng.getState().activeLoops).toBe(4)
     eng.update(0.11)
     expect(eng.getState().activeLoops).toBe(6)
+  })
+
+  it('realizes the nearest emitters first (after a teleport the closest sound comes first)', () => {
+    const { eng, consent } = track(setup())
+    eng.acquire()
+    consent()
+    warmUp()
+    eng.setListenerOverride([300, 1, 300])
+    const names = ['furnace-roar', 'fan-hum', 'server-hum', 'transformer-hum', 'steam-vent', 'radio-music'] as const
+    names.forEach((n, i) => eng.api.loop(n, { position: [i * 5, 1, 0], maxDistance: 40 }))
+    eng.update(0.11)
+    expect(eng.getState().activeLoops).toBe(0)
+    // teleport next to the last-registered emitter: all six are in range, two realize per tick
+    eng.setListenerOverride([26, 1, 0])
+    expect(
+      eng
+        .getLoops()
+        .filter((l) => l.active)
+        .map((l) => l.name)
+        .sort(),
+    ).toEqual(['radio-music', 'steam-vent'])
   })
 
   it('non-positional loops (music, ambience) start with consent', () => {

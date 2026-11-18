@@ -73,6 +73,20 @@ describe('route guard timing', () => {
     expect(g.reason).toBe('idle')
   })
 
+  it('returns a forklift abandoned in a restricted zone after 10 s (e.g. after an OSHA tackle)', () => {
+    const onPad: GuardInput = { x: 16, z: -34, yaw: NORTH, occupied: false, upright: true }
+    const g = new RouteGuard()
+    expect(run(g, onPad, ROUTE_GUARD.restrictedAfter - 0.5)).toEqual([])
+    expect(run(g, onPad, 1)).toEqual(['return'])
+    expect(g.reason).toBe('restricted')
+    // brushing the transformer yard with the forks counts too
+    const g2 = new RouteGuard()
+    expect(run(g2, { x: 17.5, z: -0.4, yaw: NORTH, occupied: false, upright: true }, ROUTE_GUARD.restrictedAfter + 0.5)).toEqual(['return'])
+    // a forklift merely near (not in) a restricted zone is left alone until the idle rule
+    const g3 = new RouteGuard()
+    expect(run(g3, offRoute, ROUTE_GUARD.restrictedAfter + 5)).toEqual([])
+  })
+
   it('never acts while occupied, and occupancy resets the timers', () => {
     const g = new RouteGuard()
     run(g, inDoor, 25)

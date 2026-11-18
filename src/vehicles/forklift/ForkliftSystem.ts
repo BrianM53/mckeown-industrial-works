@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type RAPIER from '@dimforge/rapier3d-compat'
 import { interactionGroups, type RapierRigidBody } from '@react-three/rapier'
 import { audio, type LoopHandle } from '@/audio/api'
-import { CG } from '@/core/collision'
+import { CG, GROUPS } from '@/core/collision'
 import { events } from '@/core/events'
 import { clamp, wrapAngle } from '@/core/math'
 import { createRng, hashString } from '@/core/rng'
@@ -37,10 +37,19 @@ type World = RAPIER.World
 /** Scene-query filters (membership, filter). */
 const Q_GROUND = interactionGroups(CG.VEHICLE, [CG.STATIC, CG.PROP])
 const Q_FLOOR = interactionGroups(CG.VEHICLE, [CG.STATIC])
-const Q_WORKER = interactionGroups(CG.PLAYER, [CG.STATIC, CG.VEHICLE, CG.NPC, CG.PROP])
-const Q_WORKER_NO_PROPS = interactionGroups(CG.PLAYER, [CG.STATIC, CG.VEHICLE, CG.NPC])
+// Worker-sized probes. Also members of PROP so they still see the driven
+// forklift (whose filter drops PLAYER, see G_DRIVEN) and every NPC / prop.
+const Q_WORKER = interactionGroups([CG.PLAYER, CG.PROP], [CG.STATIC, CG.VEHICLE, CG.NPC, CG.PROP])
+const Q_WORKER_NO_PROPS = interactionGroups([CG.PLAYER, CG.PROP], [CG.STATIC, CG.VEHICLE, CG.NPC])
 const Q_PARK = interactionGroups(CG.VEHICLE, [CG.STATIC, CG.PLAYER, CG.NPC])
 const Q_WEDGED = interactionGroups(CG.VEHICLE, [CG.STATIC])
+/**
+ * Collision groups while somebody drives: like GROUPS.vehicle minus PLAYER.
+ * The worker's capsule is hidden inside / beside the cab while driving; even
+ * disabled, a capsule whose body gets moved can still produce contacts in
+ * Rapier 0.19 (observed: it shoved the forklift 0.29 m into the floor).
+ */
+const G_DRIVEN = interactionGroups(CG.VEHICLE, [CG.STATIC, CG.PROP, CG.NPC, CG.BALL, CG.SENSOR])
 
 const HINT = {
   overturn: { desktop: 'Forklift on its side — press R to recover', touch: 'Forklift on its side — tap Recover' },
@@ -111,6 +120,11 @@ export class ForkliftSystem {
 
   // ---- crashes
   private readonly vSet = { x: 0, y: 0, z: 0 }
+  private readonly planar = { x: 0, z: 0 }
+  private groupsApplied = -1
+  private groupsBody: RapierRigidBody | null = null
+  private traceLeft = 0
+  private traceLog: Array<Record<string, number | boolean>> = []
   private vSetValid = false
   private impactCooldown = 0
   /** Seconds the anti-roll/yaw assistance is suspended (after a crash kick / flip). */
@@ -129,9 +143,6 @@ export class ForkliftSystem {
   hornAge = 99
   private exhaustTimer = 0
   private captionCooldown = 0
-  private syncX = 0
-  private syncZ = 0
-  private syncTimer = 0
   private mismatchFor = 0
   private orphanFor = 0
   private refusals = 0
@@ -176,6 +187,8 @@ export class ForkliftSystem {
     this.input.clear()
     this.body = null
     this.group = null
+    this.groupsApplied = -1
+    this.groupsBody = null
   }
 
   // ======================================================================== services
@@ -217,9 +230,6 @@ export class ForkliftSystem {
     this.input.suppressHeld()
     this.steer = 0
     this.stuck.reset()
-    this.syncX = runtime.player.position.x
-    this.syncZ = runtime.player.position.z
-    this.syncTimer = 0.25
     this.mismatchFor = 0
     try {
       player?.setLocked(true, 'forklift')
@@ -280,6 +290,8 @@ export class ForkliftSystem {
     } catch (err) {
       console.error('[vehicles] leaving the forklift failed', err)
     }
+    // the worker stands beside it now: collide with them again from the very next step
+    this.syncGroups(this.body)
     events.emit('forklift:exit', {})
     this.stopEngine()
     this.setHint(null)
@@ -449,6 +461,8 @@ export class ForkliftSystem {
     } catch {
       return
     }
+    this.syncGroups(body)
+
     // ---- NaN / fell out of the world / escaped the playable area → recover
     if (!finite3(t) || !Number.isFinite(r.w)) {
       this.placeAt(HOME.x, HOME.z, HOME.yaw)
@@ -494,6 +508,7 @@ export class ForkliftSystem {
 
     const testing = this.input.testActive
     this.input.read(this.intent, this.occupied)
+    this.input.advance(dt)
     this.throttle = this.intent.throttle
     const control = this.grounded && this.upDot > 0.6
     let changed = false
@@ -526,7 +541,9 @@ export class ForkliftSystem {
     this.yawRate = wy
 
     // ---- caps: stable, no tunneling, no orbit
-    const planar = { x: vx, z: vz }
+    const planar = this.planar
+    planar.x = vx
+    planar.z = vz
     if (capPlanar(planar, DRIVE.maxSpeed)) {
       vx = planar.x
       vz = planar.z
@@ -548,6 +565,10 @@ export class ForkliftSystem {
       body.setLinvel({ x: vx, y: vy, z: vz }, true)
       body.setAngvel({ x: wx, y: wy, z: wz }, true)
     }
+    if (this.traceLeft > 0) {
+      this.traceLeft--
+      this.traceLog.push({ t: this.time, x: t.x, y: t.y, z: t.z, vy: lv.y, speed: this.speed, steer: this.steer, up: this.upDot, changed, control, grounded: this.grounded })
+    }
     this.vSet.x = vx
     this.vSet.y = vy
     this.vSet.z = vz
@@ -559,14 +580,32 @@ export class ForkliftSystem {
       events.emit('forklift:overturned', { position: this.positionVec(0.5) })
       if (this.occupied) events.emit('achievement', { id: 'forklift-flipped' })
     }
-    if (this.occupied && control) this.stuck.update(dt, this.intent.held, Math.hypot(vx, vz))
-    else if (!this.occupied) this.stuck.reset()
+    // (also without traction: high-centred on a pallet pile counts as stuck)
+    if (this.occupied) this.stuck.update(dt, this.intent.held, Math.hypot(vx, vz))
+    else this.stuck.reset()
 
-    this.safe.update(dt, () => {
-      if (this.upDot < 0.94 || !this.grounded || Math.abs(wy) > 1.6 || this.overturn.overturned) return null
-      const pose = { x: this.pos.x, z: this.pos.z, yaw: this.yaw }
-      return this.wedged(pose) ? null : pose
-    })
+    this.safe.update(dt, this.sampleSafe)
+  }
+
+  /** Safe-position sample (asked ~1 Hz by the tracker): upright, grounded, calm, not wedged. */
+  private readonly sampleSafe = (): Pose2 | null => {
+    if (this.upDot < 0.94 || !this.grounded || Math.abs(this.yawRate) > 1.6 || this.overturn.overturned) return null
+    const pose = { x: this.pos.x, z: this.pos.z, yaw: this.yaw }
+    return this.wedged(pose) ? null : pose
+  }
+
+  /** Driven: ignore the (hidden) worker capsule. Parked: collide with the worker like any obstacle. */
+  private syncGroups(body: RapierRigidBody | null): void {
+    if (!body) return
+    const want = this.occupied ? G_DRIVEN : GROUPS.vehicle
+    if (this.groupsApplied === want && this.groupsBody === body) return
+    try {
+      for (let i = 0; i < body.numColliders(); i++) body.collider(i).setCollisionGroups(want)
+      this.groupsApplied = want
+      this.groupsBody = body
+    } catch {
+      /* body being removed */
+    }
   }
 
   /** After the world stepped: an unexplained velocity jump is a crash. */
@@ -665,10 +704,7 @@ export class ForkliftSystem {
     f.upright = !this.overturn.overturned
 
     this.watchPlayerMode(dt)
-    if (this.occupied) {
-      this.syncParkedWorker(dt)
-      this.updateEngine(dt)
-    }
+    if (this.occupied) this.updateEngine(dt)
     this.updateHint()
   }
 
@@ -695,28 +731,6 @@ export class ForkliftSystem {
         }
       }
     } else this.orphanFor = 0
-  }
-
-  /**
-   * The worker's (hidden, non-colliding) body stays where they climbed in. Keep
-   * it near the forklift so the player module treats our exit placement as a
-   * short hop (smooth camera instead of a hard cut).
-   */
-  private syncParkedWorker(dt: number): void {
-    if (runtime.player.mode !== 'forklift') return
-    this.syncTimer -= dt
-    if (this.syncTimer > 0) return
-    this.syncTimer = 0.25
-    const p = runtime.forklift.position
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) return
-    if (Math.hypot(p.x - this.syncX, p.z - this.syncZ) < 5) return
-    this.syncX = p.x
-    this.syncZ = p.z
-    try {
-      getService('player')?.teleport(p.x, p.z, this.visualYaw)
-    } catch {
-      /* ignore */
-    }
   }
 
   private startEngine(): void {
@@ -763,7 +777,7 @@ export class ForkliftSystem {
     this.exhaustTimer -= dt
     if (this.exhaustTimer > 0) return
     const load = clamp(Math.abs(this.speed) / DRIVE.maxForward + Math.abs(this.throttle) * 0.5, 0, 1)
-    this.exhaustTimer = (0.5 - 0.32 * load) * (lowQuality ? 1.8 : 1)
+    this.exhaustTimer = (0.42 - 0.26 * load) * (lowQuality ? 1.8 : 1)
     // idle: light grey wisps; flat out: darker, bigger diesel clouds
     _exhaust.copy(EXHAUST_IDLE).lerp(EXHAUST_LOAD, load)
     this.puffs.emit(x, y, z, {
@@ -771,8 +785,8 @@ export class ForkliftSystem {
       vy: 0.9 + load * 0.6,
       vz: (this.rng() - 0.5) * 0.3,
       life: 1.1 + this.rng() * 0.4,
-      size0: 0.06,
-      size1: 0.2 + load * 0.12,
+      size0: 0.05,
+      size1: 0.14 + load * 0.1,
       color: _exhaust,
       lift: 0.5,
       drag: 1.4,
@@ -949,8 +963,71 @@ export class ForkliftSystem {
       recover: () => this.recover('debug'),
       returnHome: () => this.returnHome({ force: true }),
       horn: () => this.horn(),
-      /** Programmatic driving input for tests: throttle/steer in -1..1 for `ms`. */
+      /** Programmatic driving input for tests: throttle/steer in -1..1 for `ms` of PHYSICS time (frame-rate independent). */
       drive: (throttle: number, steer: number, ms = 1000) => this.input.setTest(throttle, steer, ms),
+      /** Record the next `n` physics steps (read with traceRead()). */
+      trace: (n = 60) => {
+        this.traceLog = []
+        this.traceLeft = Math.max(0, Math.min(600, n | 0))
+      },
+      traceRead: () => this.traceLog.map((e) => Object.fromEntries(Object.entries(e).map(([k, v]) => [k, typeof v === 'number' ? round(v) : v]))),
+      /** Raw physics state: body pose/velocities/mass and each collider's world position + contact count. */
+      body: () => {
+        const b = this.body
+        const w = this.world
+        if (!b) return null
+        try {
+          const t = b.translation()
+          const r = b.rotation()
+          const lv = b.linvel()
+          const com = b.worldCom()
+          const cols: Array<{ shape: number; y: number; contacts: number }> = []
+          const others = new Map<number, { groups: string; bodyType: number | null; name: string; pos: number[]; touching: boolean; enabled: boolean }>()
+          for (let i = 0; i < b.numColliders(); i++) {
+            const c = b.collider(i)
+            let contacts = 0
+            try {
+              w?.contactPairsWith(c, (o) => {
+                contacts++
+                let touching = false
+                try {
+                  w.contactPair(c, o, (m) => {
+                    if (m.numContacts() > 0) touching = true
+                  })
+                } catch {
+                  /* ignore */
+                }
+                const prev = others.get(o.handle)
+                const ob = o.parent()
+                const ot = o.translation()
+                others.set(o.handle, {
+                  groups: (o.collisionGroups() >>> 0).toString(16),
+                  bodyType: ob ? ob.bodyType() : null,
+                  name: String((ob?.userData as { name?: string } | undefined)?.name ?? ''),
+                  pos: [round(ot.x), round(ot.y), round(ot.z)],
+                  touching: touching || !!prev?.touching,
+                  enabled: o.isEnabled(),
+                })
+              })
+            } catch {
+              contacts = -1
+            }
+            cols.push({ shape: c.shapeType(), y: round(c.translation().y), contacts })
+          }
+          return {
+            t: [round(t.x), round(t.y), round(t.z)],
+            q: [round(r.x), round(r.y), round(r.z), round(r.w)],
+            v: [round(lv.x), round(lv.y), round(lv.z)],
+            com: [round(com.x), round(com.y), round(com.z)],
+            mass: round(b.mass()),
+            ccd: b.isCcdEnabled(),
+            cols,
+            others: [...others.values()],
+          }
+        } catch (err) {
+          return String(err)
+        }
+      },
       /** Place the forklift (upright, at rest). */
       teleport: (x: number, z: number, yaw?: number) => this.placeAt(x, z, yaw ?? this.yaw),
       getState: () => {
@@ -974,9 +1051,16 @@ export class ForkliftSystem {
             }
           })(),
           lastSafe: ls ? [round(ls.x), round(ls.z)] : null,
-          guard: { blockingFor: round(this.guard.blockingFor), idleFor: round(this.guard.idleFor) },
+          guard: {
+            blockingFor: round(this.guard.blockingFor),
+            restrictedFor: round(this.guard.restrictedFor),
+            idleFor: round(this.guard.idleFor),
+            lastReason: this.guard.reason,
+          },
           lastImpact: { ago: round(this.lastImpact.t), strength: round(this.lastImpact.strength) },
           hint: this.hint,
+          /** Seconds left of the current programmatic drive (0 = done). */
+          driveLeft: round(this.input.testLeft),
         }
       },
     }

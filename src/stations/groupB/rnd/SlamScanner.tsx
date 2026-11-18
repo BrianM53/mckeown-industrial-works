@@ -14,6 +14,7 @@ import { Batch } from '../shared/batch'
 import { BatchMeshes } from '../shared/BatchMeshes'
 import { fitText, makeCanvasTexture, roundRectPath } from '../shared/canvas'
 import { FONT_DISPLAY, FONT_MONO } from '../shared/fonts'
+import { shown } from '../shared/hooks'
 import { SCANNER } from './layout'
 import { sampleSplats, scanState, type ScanState } from './splats'
 
@@ -66,7 +67,7 @@ const SPLAT_VERT = /* glsl */ `
     gl_Position = projectionMatrix * mv;
     vUv = uv;
     vColor = aColor;
-    vAlpha = on * mix(0.1, 0.9, k) * (1.0 - uDissolve);
+    vAlpha = on * mix(0.12, 0.8, k) * (1.0 - uDissolve);
   }`
 
 const SPLAT_FRAG = /* glsl */ `
@@ -78,7 +79,8 @@ const SPLAT_FRAG = /* glsl */ `
     float g = exp(-dot(d, d) * 16.0);
     float a = g * vAlpha;
     if (a < 0.012) discard;
-    gl_FragColor = vec4(vColor * a * 1.35 + vec3(0.02, 0.03, 0.06) * a, 1.0);
+    // modest gain: overlapping additive splats must keep the figurine's colors, not burn to white
+    gl_FragColor = vec4(vColor * a * 0.62 + vec3(0.015, 0.025, 0.05) * a, 1.0);
     #include <colorspace_fragment>
   }`
 
@@ -318,6 +320,7 @@ export function SlamScanner({ quality, reduced, debug }: { quality: 'low' | 'med
   })
 
   useFrame((_, rawDt) => {
+    if (!shown(turntable.current)) return
     const dt = Math.min(Math.max(rawDt, 0), 0.1)
     const t = simClock.t
     const s = scanState(t, SCANNER.cycle, SCANNER.hold, SCANNER.dissolve, scanOut)

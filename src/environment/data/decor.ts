@@ -392,8 +392,8 @@ export const FURNITURE: Furniture[] = [
   { kind: 'table', rect: rectAt(37.2, 27.1, 2.1, 2.1), h: 0.76 },
   { kind: 'sofa', rect: R(31.2, 34.0, 34.6, 35.45), h: 0.85, yaw: 0 },
   { kind: 'plantPot', rect: rectAt(38.35, 35.0, 0.7, 0.7), h: 1.6 },
-  { kind: 'glassWall', rect: R(38.95, 39.05, 30.5, 35.5), h: 6.0 },
-  { kind: 'glassWall', rect: R(39.05, 43.5, 30.45, 30.55), h: 6.0 },
+  { kind: 'glassWall', rect: R(38.95, 39.05, 30.5, 35.5), h: 3.85 },
+  { kind: 'glassWall', rect: R(39.05, 43.5, 30.45, 30.55), h: 3.85 },
   // Control Room (perimeter only)
   { kind: 'cabinetTall', rect: R(-45.45, -44.85, 7.0, 9.6), h: 2.2, yaw: -HALF },
   { kind: 'cabinetTall', rect: R(-45.45, -44.85, 16.4, 19.0), h: 2.2, yaw: -HALF },
@@ -414,6 +414,8 @@ export const EXEC_OFFICE = {
   rect: R(39.05, 43.5, 30.55, 35.5),
   door: { z0: 32.35, z1: 33.65, x: 39.0 },
   glassHeight: 3.1,
+  /** Top of the modular office pod (fascia band above the glass, flat ceiling). */
+  podHeight: 3.75,
 }
 
 // ---------------------------------------------------------------------------

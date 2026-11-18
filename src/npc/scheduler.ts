@@ -131,11 +131,19 @@ export class GagScheduler {
       ;[order[i], order[j]] = [order[j], order[i]]
     }
     for (const def of order) {
-      if (!this.actorsReady(def, host) || !host.visible(def)) continue
+      if (!this.actorsReady(def, host) || this.playerInTheWay(def, host) || !host.visible(def)) continue
       if (!this.director.request({ id: def.id, kind: 'ambient', cooldown: def.cooldown, duration: def.duration + SCHEDULER.lockPadding })) continue
       this.begin(def, host)
       return true
     }
+    return false
+  }
+
+  /** The visitor stands where the choreography will sweep through. */
+  playerInTheWay(def: GagDef, host: SchedulerHost): boolean {
+    if (!def.keepClear) return false
+    const { x, z } = host.player
+    for (const [cx, cz, r] of def.keepClear) if (Math.hypot(x - cx, z - cz) < r) return true
     return false
   }
 

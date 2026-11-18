@@ -38,8 +38,10 @@ export function onAirTarget(i: OnAirInput): boolean {
 /** Smoothly approach the target brightness (0..1). */
 export function stepLight(cur: number, on: boolean, dt: number, reduced: boolean): number {
   const target = on ? 1 : 0
+  if (!Number.isFinite(cur)) return target
+  if (!Number.isFinite(dt) || dt <= 0) return cur
   const rate = reduced ? 2.5 : 9
-  const k = 1 - Math.exp(-rate * Math.max(0, Math.min(dt, 0.25)))
+  const k = 1 - Math.exp(-rate * Math.min(dt, 0.25))
   const next = cur + (target - cur) * k
   return Math.abs(next - target) < 0.002 ? target : next
 }

@@ -149,6 +149,13 @@ function buildMailbox(cells: Record<string, { uv: [number, number, number, numbe
   b.rbox('metal', [POST_X, RUN_Y + 0.12, MZ], [0.22, 0.34, 0.3], 0.03, C.brassDark)
   b.cylAxis('metal', [POST_X - 0.12, RUN_Y + 0.16, MZ], 'x', 0.08, 0.03, C.brass, 16)
   b.plane('sign', [POST_X - 0.137, RUN_Y + 0.16, MZ], 0.13, 0.13, '#ffffff', [0, -ry, 0], uv('gauge'))
+  return b
+}
+
+/** The thin overhead run (y ≈ 4.9): the camera fades it while it hides the worker instead of colliding with it. */
+function buildOverhead(): Builder {
+  const b = new Builder()
+  const POST_X = MX + 0.36
   // overhead run east to the office + elbow + wall flange
   b.tube('glass', [TUBE_X + 0.1, RUN_Y, MZ], [TUBE_ENTRY.x - 0.1, RUN_Y, MZ], 0.075, '#ffffff', 16, undefined, true)
   for (let x = TUBE_X + 0.6; x < TUBE_ENTRY.x - 0.3; x += 0.7) b.cylAxis('metal', [x, RUN_Y, MZ], 'x', 0.092, 0.06, C.brass, 16)
@@ -193,6 +200,7 @@ export function ContactMailbox({ shadows, atlasScale }: { shadows: boolean; atla
     [atlas, signMat],
   )
   const meshes = useBuilt(() => buildMailbox(atlas.cells), [atlas])
+  const overhead = useBuilt(buildOverhead, [])
   const mats = useMemo(
     () => ({
       brass: new THREE.MeshStandardMaterial({ color: C.brass, roughness: 0.28, metalness: 0.9 }),
@@ -281,6 +289,7 @@ export function ContactMailbox({ shadows, atlasScale }: { shadows: boolean; atla
   return (
     <group name="contact-mailbox">
       <BuiltMeshes meshes={meshes} shadows={shadows} materialFor={(k) => (k === 'sign' ? signMat : undefined)} />
+      <BuiltMeshes meshes={overhead} shadows={shadows} cameraFade />
       <group ref={capsuleRef} position={CAPSULE_PATH[0]}>
         <mesh geometry={CAPSULE_GEO} material={mats.brass} />
         <mesh geometry={BAND_GEO} material={mats.felt} position={[0, 0.08, 0]} />

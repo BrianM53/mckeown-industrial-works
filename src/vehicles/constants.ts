@@ -116,6 +116,8 @@ export const RECOVERY = {
 export const ROUTE_GUARD = {
   /** Unoccupied forklift parked in a door span / on a waypoint segment longer than this → returned. */
   blockingAfter: 30,
+  /** Unoccupied with its footprint in a restricted zone longer than this → returned. */
+  restrictedAfter: 10,
   /** Unoccupied anywhere away from home longer than this → returned. */
   idleAfter: 180,
   /** Unoccupied and on its side longer than this → set back on its wheels in place. */

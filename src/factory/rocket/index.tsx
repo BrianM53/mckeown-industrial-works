@@ -38,6 +38,7 @@ import {
   CUSHION,
   DECK_TOP,
   DECK_Y,
+  IGNITION_CAPTION,
   IGNITION_SHAKE,
   KIOSK,
   PAD_BEACONS,
@@ -201,7 +202,7 @@ function TransporterProxy({ rt }: { rt: RocketRuntime }) {
   const body = useRef<RapierRigidBody>(null)
   const deck = useRef<RapierCollider>(null)
   const stack = useRef<RapierCollider>(null)
-  const state = useRef({ deck: false, stack: false })
+  const state = useRef({ deck: false, stack: false, synced: false })
 
   useFrame(() => {
     const b = body.current
@@ -214,11 +215,15 @@ function TransporterProxy({ rt }: { rt: RocketRuntime }) {
     const r = factory.state.rocket
     const wantDeck = rt.parked && !inside
     const wantStack = wantDeck && rt.rocketOnDeck && (r.phase !== 'assembling' || r.stagesComplete >= 1)
-    if ((wantDeck && !state.current.deck) || (wantStack && !state.current.stack)) {
+    // (re)place the body whenever a collider is about to be (re)enabled — and
+    // once at start, since the colliders are created enabled at the body's spawn pose
+    if (!state.current.synced || (wantDeck && !state.current.deck) || (wantStack && !state.current.stack)) {
       rt.transporterMatrix.decompose(_pos, _quat, _scl)
+      if (!Number.isFinite(_pos.x + _pos.z + _quat.w)) return
       try {
         b.setTranslation({ x: _pos.x, y: 0, z: _pos.z }, true)
         b.setRotation({ x: _quat.x, y: _quat.y, z: _quat.z, w: _quat.w }, true)
+        state.current.synced = true
       } catch {
         return
       }
@@ -241,9 +246,10 @@ function TransporterProxy({ rt }: { rt: RocketRuntime }) {
     }
   })
 
-  // start disabled; the frame loop enables them once the crawler is parked
+  // the colliders are created enabled: mark them so, the frame loop then
+  // disables / re-places them as needed (also after a StrictMode remount)
   useEffect(() => {
-    state.current = { deck: true, stack: true }
+    state.current = { deck: true, stack: true, synced: false }
   }, [])
 
   return (
@@ -307,12 +313,17 @@ function LaunchEvents() {
     if (isOverlayBlocking()) return
     const p = runtime.player.position
     const d = Math.hypot(p.x - PAD_X, p.z - PAD_Z)
+    if (!Number.isFinite(d)) return
     const k = clamp(1.25 - d / 80, 0.25, 1)
+    // the camera ignores shake under reduced motion; the caption is the alternate cue
     events.emit('shake', { intensity: IGNITION_SHAKE.intensity * k, duration: IGNITION_SHAKE.duration })
+    if (d <= WITNESS_RANGE * 1.5) events.emit('caption', { text: IGNITION_CAPTION, kind: 'sound', duration: 3 })
   })
   useGameEvent('rocket:countdown', (p) => {
-    // best-effort pacing: other disruptive gags stand aside during the launch
-    if (p.secondsLeft >= 10) director.request({ id: 'rocket:launch', kind: 'disruptive', cooldown: 60, duration: 32 })
+    // Pacing hint only: the launch occupies an AMBIENT slot so fewer gags pile
+    // on top of it. Never 'disruptive' — an exclusive lock would refuse the
+    // visitor's own actions (Night Shift button, OSHA tackles) for 32 s.
+    if (p.secondsLeft >= 10) director.request({ id: 'rocket:launch', kind: 'ambient', cooldown: 60, duration: 32 })
   })
   useGameEvent('rocket:reset', () => director.end('rocket:launch'))
   useGameEvent('rocket:liftoff', () => {

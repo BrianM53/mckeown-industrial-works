@@ -72,3 +72,10 @@ export function useLampDimmer(): void {
 export function inRect(r: Rect, x: number, z: number, pad = 0): boolean {
   return x >= r.minX - pad && x <= r.maxX + pad && z >= r.minZ - pad && z <= r.maxZ + pad
 }
+
+/** True when the object and all its ancestors are visible (skip per-frame work for gated stations). */
+export function shown(o: THREE.Object3D | null | undefined): boolean {
+  if (!o) return false
+  for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return false
+  return true
+}

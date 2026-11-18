@@ -26,6 +26,8 @@ import {
 } from './emitters'
 import { engine } from './engine'
 import { clamp01, phaseCrossed } from './logic'
+import { LOOP_NAMES } from './synth/loops'
+import { SFX_NAMES } from './synth/sfx'
 import { wireAudioEvents } from './wiring'
 
 /**
@@ -256,6 +258,8 @@ export default function AudioScene() {
         emit: <K extends GameEventName>(name: K, payload: GameEvents[K]) => events.emit(name, payload),
         setListenerOverride: (p: Vec3 | null) => engine.setListenerOverride(p),
         liveHandles: () => liveLoopCount(),
+        /** Every implemented sound name (e2e tests iterate these). */
+        names: () => ({ sfx: [...SFX_NAMES], loops: [...LOOP_NAMES] }),
         perf: () => engine.takePerf(),
         measure: (what?: string) => import('./measure').then((m) => m.runMeasurement(what)),
       }),

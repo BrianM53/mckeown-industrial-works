@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Billboard, Text } from '@react-three/drei'
 import * as THREE from 'three'
@@ -530,11 +530,31 @@ function BubbleSlot({ world, slot, reduced }: { world: NpcWorld; slot: number; r
   )
 }
 
+/**
+ * drei <Text> suspends while troika loads its font. Each bubble therefore gets its
+ * own Suspense boundary (otherwise the FIRST bubble of a session would suspend the
+ * whole NPC module and every worker and prop would blink out until the font is
+ * ready), and an invisible warm-up label loads the font right at mount so the
+ * first real bubble normally doesn't wait at all.
+ */
+function FontWarmup() {
+  return (
+    <Text font={FONT_URL} fontSize={0.01} visible={false} frustumCulled={false}>
+      Zzz
+    </Text>
+  )
+}
+
 export function Bubbles({ world, reduced }: { world: NpcWorld; reduced: boolean }) {
   return (
     <>
+      <Suspense fallback={null}>
+        <FontWarmup />
+      </Suspense>
       {Array.from({ length: BUBBLE_SLOTS }, (_, i) => (
-        <BubbleSlot key={i} world={world} slot={i} reduced={reduced} />
+        <Suspense key={i} fallback={null}>
+          <BubbleSlot world={world} slot={i} reduced={reduced} />
+        </Suspense>
       ))}
     </>
   )

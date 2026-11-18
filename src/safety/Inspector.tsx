@@ -25,6 +25,9 @@ const SPINE_BONE = 2
 const BURIED = 1.95
 const GROUND_RAY_GROUPS = interactionGroups(CG.NPC, [CG.STATIC])
 const PARKED_Y = -40
+/** Ground probe: ray origin above the current floor height, and the highest step he may climb per probe. */
+const PROBE_UP = 0.6
+const MAX_STEP_UP = 0.35
 
 /** Lanyard + brass whistle in the spine bone's local frame (bind pose: spine joint at y 1.05). */
 function buildWhistleGeometry(): THREE.BufferGeometry {
@@ -150,11 +153,16 @@ export function InspectorVisual({ fsm }: { fsm: OshaFsm }) {
       gr.z = a.z
       try {
         ray.origin.x = a.x
-        ray.origin.y = gr.y + 0.6
+        ray.origin.y = gr.y + PROBE_UP
         ray.origin.z = a.z
         const hit = world.castRay(ray, 3, true, rapier.QueryFilterFlags.EXCLUDE_SENSORS, GROUND_RAY_GROUPS)
-        const y = hit ? ray.origin.y - hit.timeOfImpact : 0
-        gr.y = Number.isFinite(y) && y > -0.5 && y < 3 ? y : 0
+        if (!hit) gr.y = 0
+        else if (hit.timeOfImpact > 1e-3) {
+          // Follow ramps and decks, but never climb a tall obstacle he sprints
+          // through (a hit from inside a collider, toi≈0, is ignored as well).
+          const y = ray.origin.y - hit.timeOfImpact
+          if (Number.isFinite(y) && y > -0.5 && y < 3 && y <= gr.y + MAX_STEP_UP) gr.y = y
+        }
       } catch {
         gr.y = 0
       }

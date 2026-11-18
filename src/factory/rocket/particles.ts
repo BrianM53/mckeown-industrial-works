@@ -62,6 +62,13 @@ void main() {
 }
 `
 
+/** Upload only the live part of an instance attribute. */
+function flush(attr: THREE.InstancedBufferAttribute, n: number, size: number): void {
+  attr.clearUpdateRanges()
+  attr.addUpdateRange(0, Math.max(1, n) * size)
+  attr.needsUpdate = true
+}
+
 export class ParticleBuffer {
   readonly capacity: number
   readonly mesh: THREE.Mesh
@@ -224,15 +231,9 @@ export class ParticleBuffer {
       C[j * 3 + 2] = this.cb[i]
     }
     this.geometry.instanceCount = n
-    for (const [attr, size] of [
-      [this.iPos, 3],
-      [this.iData, 4],
-      [this.iColor, 3],
-    ] as const) {
-      attr.clearUpdateRanges()
-      attr.addUpdateRange(0, Math.max(1, n) * size)
-      attr.needsUpdate = true
-    }
+    flush(this.iPos, n, 3)
+    flush(this.iData, n, 4)
+    flush(this.iColor, n, 3)
   }
 
   dispose(): void {

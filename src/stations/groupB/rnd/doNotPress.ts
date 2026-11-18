@@ -78,7 +78,8 @@ export class DoNotPressMachine {
   }
 
   update(dt: number): DnpChannels {
-    const step = Math.min(Math.max(dt, 0), 0.25)
+    // NaN-safe: an invalid frame delta never poisons the timers
+    const step = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), 0.25) : 0
     this.t += step
     this.sinceLast += step
     if (this.b2At >= 0) this.b2At += step

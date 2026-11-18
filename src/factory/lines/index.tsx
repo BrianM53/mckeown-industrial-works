@@ -7,7 +7,7 @@
  * status / defectFlash / rate / beltSpeed — no independent timers, so the
  * press ram hits bottom exactly when the audio thump plays (phase 0.5).
  *
- *   Debug: __MIW__.lines.stats() · .spots() · .colliders() · .reject() · .visitor()
+ *   Debug: __MIW__.lines.stats() · .spots() · .colliders() · .reject() · .visitor() · .defect(id, s)
  *   Worker spots for the npc module: import { LINE_WORKER_SPOTS } from '@/factory/lines/spots'
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -15,10 +15,12 @@ import { useFrame } from '@react-three/fiber'
 import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
 import { GROUPS } from '@/core/collision'
 import { registerDebug } from '@/core/debug'
+import type { LineId } from '@/core/types'
 import { useInteractable } from '@/core/interaction'
 import { useGameStore } from '@/state/game'
 import { useSettings } from '@/state/settings'
 import { useUIStore } from '@/state/ui'
+import { factory } from '@/systems/factory'
 import { ANCHORS } from '@/world/layout'
 import { COLLIDERS } from './config'
 import { loadLineFonts } from './render/fonts'
@@ -74,6 +76,17 @@ export default function ProductionLines() {
         visitor: () => {
           world.payload.debugVisitor()
           return world.payload.stats()
+        },
+        /**
+         * Test hook: make a line's QC catch a defect right now (sets
+         * factory.state.lines[id].defectFlash, which the sim decays) — tank
+         * steam leak, circuit rack red, payload pod into the reject bin…
+         */
+        defect: (id: LineId = 'tank', seconds = 2.5) => {
+          const L = factory.state.lines[id]
+          if (!L) return null
+          L.defectFlash = Math.max(L.defectFlash, Number.isFinite(seconds) ? seconds : 2.5)
+          return { id, defectFlash: L.defectFlash }
         },
       }),
     [world],

@@ -264,10 +264,12 @@ export const ROSTER: NpcDef[] = [
     seed: 113,
     zone: 'server',
     speed: 1.0,
-    // the cold aisle between rack rows A and B (north and south blocks), facing row A's fronts
+    // the hot aisle between rack rows B and C (north and south blocks), patching cables on
+    // row C's backs. Crossing the central aisle here keeps him ≥ 1.2 m from the terminal
+    // spot and clear of the door zone (the cold aisle crossing passed right by the terminal).
     stations: [
-      { id: 'rack-n', pos: [-35.5, -13.3], yaw: WEST, activity: 'work', dur: [9, 14] },
-      { id: 'rack-s', pos: [-35.5, -4.75], yaw: WEST, activity: 'work', dur: [7, 11] },
+      { id: 'rack-n', pos: [-33.35, -13.3], yaw: EAST, activity: 'work', dur: [9, 14] },
+      { id: 'rack-s', pos: [-33.35, -4.75], yaw: EAST, activity: 'work', dur: [7, 11] },
     ],
     routine: ['rack-n', 'rack-s'],
     legs: [{ from: 'rack-n', to: 'rack-s' }],

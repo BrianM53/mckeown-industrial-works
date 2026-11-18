@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SHRED_DELAY, WINDUP_ARM, cues, cuesBetween, isShredPrint, poseAt, timeline, type Cue } from './resumeSequence'
+import { SHRED_DELAY, WINDUP_ARM, blankPose, cues, cuesBetween, isShredPrint, poseAt, timeline, type Cue } from './resumeSequence'
 
 describe('résumé print sequence', () => {
   it('shreds every third print only', () => {
@@ -101,5 +101,15 @@ describe('résumé print sequence', () => {
     expect(cuesBetween('normal', 1, 1)).toEqual([])
     expect(cuesBetween('normal', 2, 1)).toEqual([])
     expect(cuesBetween('normal', NaN, 1)).toEqual([])
+  })
+
+  it('writes into a reused pose buffer with the same result (no per-frame allocation)', () => {
+    const buf = blankPose()
+    for (const v of ['normal', 'shred'] as const)
+      for (let t = -0.5; t < timeline(v).duration + 1; t += 0.07) {
+        const out = poseAt(v, t, buf)
+        expect(out).toBe(buf)
+        expect({ ...out }).toEqual(poseAt(v, t))
+      }
   })
 })

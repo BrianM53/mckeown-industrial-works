@@ -1034,8 +1034,8 @@ function furniture(ctx: BuildCtx, f: Furniture): void {
       const along = w > d ? 'x' : 'z'
       const len = along === 'x' ? w : d
       const gh = EXEC_OFFICE.glassHeight
-      const H = 6.0
-      // aluminium frame + mullions + glass panes + bulkhead above
+      const top = EXEC_OFFICE.podHeight
+      // modular in-plant office pod: aluminium frame + mullions + glass + walnut fascia band
       const n = Math.max(1, Math.round(len / 1.25))
       for (let k = 0; k <= n; k++) {
         const a = (along === 'x' ? r.minX : r.minZ) + (len * k) / n
@@ -1046,12 +1046,14 @@ function furniture(ctx: BuildCtx, f: Furniture): void {
         b.box('glass', cx, gh / 2, cz, w, gh, 0.02, '#ffffff')
         b.boxB('metal', cx, 0, cz, w, 0.08, 0.1, '#B4BBBD')
         b.boxB('metal', cx, gh, cz, w, 0.08, 0.1, '#B4BBBD')
-        b.boxB('paint', cx, gh + 0.08, cz, w, H - gh - 0.13, 0.12, '#E5DCC8')
+        b.boxB('paint', cx, gh + 0.08, cz, w + 0.08, top - gh - 0.08, 0.14, '#4A3428')
+        b.boxB('metal', cx, top - 0.06, cz, w + 0.1, 0.06, 0.18, '#C9B27A')
       } else {
         b.box('glass', cx, gh / 2, cz, 0.02, gh, d, '#ffffff')
         b.boxB('metal', cx, 0, cz, 0.1, 0.08, d, '#B4BBBD')
         b.boxB('metal', cx, gh, cz, 0.1, 0.08, d, '#B4BBBD')
-        b.boxB('paint', cx, gh + 0.08, cz, 0.12, H - gh - 0.13, d, '#E5DCC8')
+        b.boxB('paint', cx, gh + 0.08, cz, 0.14, top - gh - 0.08, d + 0.08, '#4A3428')
+        b.boxB('metal', cx, top - 0.06, cz, 0.18, 0.06, d + 0.1, '#C9B27A')
       }
       break
     }
@@ -1105,8 +1107,8 @@ function addExecOffice(ctx: BuildCtx): void {
   b.boxB('paint', (r.minX + r.maxX) / 2, 0.012, (r.minZ + r.maxZ) / 2, r.maxX - r.minX - 0.1, 0.02, r.maxZ - r.minZ - 0.1, '#7A1F2A')
   // the single giant pie chart (on an easel, facing the glass / west)
   const [ax, az] = ANCHORS.executiveOffice.position
-  const cy = 1.75
-  const R = 1.15
+  const cy = 1.6
+  const R = 1.05
   b.cylBetween('paint', [ax + 0.06, cy, az], [ax + 0.22, cy, az], R, '#F4EFE2', 40)
   for (const [lx, lz] of [
     [0.45, -0.7],
@@ -1116,10 +1118,20 @@ function addExecOffice(ctx: BuildCtx): void {
     b.cylBetween('metal', [ax + 0.2, cy + 0.3, az], [ax + lx, 0, az + lz], 0.03, '#C9B27A', 5)
   const pc = ctx.atlas.cells['pie']
   if (pc) b.plane('sign', ax + 0.045, cy, az, R * 2 * 0.98, R * 2 * 0.98, PI / 2, pc.uv)
-  poster(ctx, 's:pietitle', ax + 0.04, cy + R + 0.32, az, 1.9, 0.42, PI / 2, 'sign')
-  // spotlight from the ceiling
-  b.cylY('paint', ax - 1.2, 4.6, az, 0.2, 0.3, DARK, 10, 0.12)
-  b.cylY('glow', ax - 1.2, 4.58, az, 0.16, 0.02, new THREE.Color('#fff2d6').multiplyScalar(3), 10)
+  poster(ctx, 's:pietitle', ax + 0.04, cy + R + 0.27, az, 1.8, 0.4, PI / 2, 'sign')
+  // pod ceiling (the exec suite is a sealed modular office inside the break room)
+  const top = EXEC_OFFICE.podHeight
+  const pcx = (r.minX + r.maxX) / 2
+  const pcz = (r.minZ + r.maxZ) / 2
+  b.boxB('paint', pcx, top, pcz, r.maxX - r.minX + 0.1, 0.1, r.maxZ - r.minZ + 0.1, '#D9D3C6')
+  // rooftop: a very serious executive air conditioner + an antenna for synergy reception
+  b.boxB('metal', pcx + 0.6, top + 0.1, pcz + 0.4, 1.3, 0.75, 1.0, '#9AA3A5')
+  b.box('paint', pcx - 0.08, top + 0.48, pcz + 0.4, 0.02, 0.5, 0.7, DARK)
+  b.cylY('metal', pcx - 1.2, top + 0.1, pcz - 1.3, 0.025, 1.1, '#B4BBBD', 5)
+  b.box('glow', pcx - 1.2, top + 1.22, pcz - 1.3, 0.06, 0.06, 0.06, new THREE.Color('#ff3b2f').multiplyScalar(2))
+  // spotlight under the pod ceiling, aimed at the chart
+  b.cylY('paint', ax - 1.2, top - 0.3, az, 0.2, 0.3, DARK, 10, 0.12)
+  b.cylY('glow', ax - 1.2, top - 0.32, az, 0.16, 0.02, new THREE.Color('#fff2d6').multiplyScalar(3), 10)
   // locked glass door + keypad + sign (on the west glass wall)
   const d = EXEC_OFFICE.door
   const dz = (d.z0 + d.z1) / 2

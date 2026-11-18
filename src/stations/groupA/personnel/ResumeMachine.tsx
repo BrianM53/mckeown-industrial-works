@@ -18,7 +18,7 @@ import { C } from '../lib/materials'
 import { ConfettiPool, PuffPool } from '../lib/particles'
 import { BuiltMeshes, useBuilt, useDisposable } from '../lib/react'
 import { SHEET_PX, drawSheet } from './art'
-import { type Cue, type PrintVariant, cuesBetween, isShredPrint, poseAt, timeline } from './resumeSequence'
+import { type Cue, type PrintVariant, blankPose, cuesBetween, isShredPrint, poseAt, timeline } from './resumeSequence'
 
 /**
  * RÉSUMÉ-O-MATIC 3000 (Personnel Office, ANCHORS.resumePrinter, facing west).
@@ -425,6 +425,7 @@ export function ResumeMachine({ atlas, signMaterial, shadows }: { atlas: Atlas; 
 
   const seq = useRef<SeqState>({ freeze: null, running: false, variant: 'normal', t: 0, prints: 0, stack: 0, pressT: -1, idlePuffIn: 2, puffIn: 0, drumFill: 0.95, confettiIn: 0 })
   const cueBuf = useRef<Cue[]>([])
+  const poseBuf = useMemo(blankPose, [])
   const clock = useRef({ t: 0, gauge: [0.12, 0.3, 0.2], gaugeVel: [0, 0, 0] })
 
   const start = (force?: PrintVariant) => {
@@ -491,11 +492,11 @@ export function ResumeMachine({ atlas, signMaterial, shadows }: { atlas: Atlas; 
     const near = Math.hypot(p.x - ORIGIN[0], p.z - ORIGIN[1]) < 40
 
     // --- sequence time + cues ------------------------------------------------
-    let pose = poseAt(s.variant, s.running ? s.t : 99)
+    let pose = poseAt(s.variant, s.running ? s.t : 99, poseBuf)
     if (s.running) {
       const t0 = s.t
       s.t = s.freeze ?? s.t + dt
-      pose = poseAt(s.variant, s.t)
+      pose = poseAt(s.variant, s.t, poseBuf)
       for (const c of cuesBetween(s.variant, t0, s.t, cueBuf.current)) {
         switch (c.kind) {
           case 'whir':

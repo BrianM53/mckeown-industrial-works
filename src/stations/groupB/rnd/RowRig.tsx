@@ -11,6 +11,7 @@ import { Batch } from '../shared/batch'
 import { BatchMeshes } from '../shared/BatchMeshes'
 import type { UvRect } from '../shared/canvas'
 import { makeLedMesh, useLedClock } from '../server/Racks'
+import { shown } from '../shared/hooks'
 import { ROW_RIG } from './layout'
 import { LAMP_ORDER, RowingModel, needleAngle, type FormError, type RowPose } from './rowing'
 
@@ -218,7 +219,7 @@ function stretch(mesh: THREE.Object3D | null, a: THREE.Vector3, b: THREE.Vector3
 
 const UNIT_CYL = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true)
 
-export function RowRig({ uv, reduced, model }: { uv: Record<string, UvRect>; reduced: boolean; model: RowingModel }) {
+export function RowRig({ uv, reduced, model, signMat }: { uv: Record<string, UvRect>; reduced: boolean; model: RowingModel; signMat: THREE.Material }) {
   useLedClock()
   const statics = useMemo(() => buildStatic(uv), [uv])
   const seatGeo = useMemo(() => buildSeat(), [])
@@ -324,6 +325,7 @@ export function RowRig({ uv, reduced, model }: { uv: Record<string, UvRect>; red
   })
 
   useFrame((_, rawDt) => {
+    if (!shown(worker.current)) return
     const dt = Math.min(Math.max(rawDt, 0), 0.1)
     const p = model.update(reduced ? dt * 0.7 : dt)
     const k = solve(p, kin.current)
@@ -381,7 +383,7 @@ export function RowRig({ uv, reduced, model }: { uv: Record<string, UvRect>; red
 
   return (
     <group name="rnd-row-rig" position={[ROW_RIG.x, 0, ROW_RIG.z]} rotation-y={ROW_RIG.yaw}>
-      <BatchMeshes geos={statics} shadows={false} materials={{ sign: SIGN_MAT_PLACEHOLDER.current! }} name="rowrig" />
+      <BatchMeshes geos={statics} shadows={false} materials={{ sign: signMat }} name="rowrig" />
       <group ref={seat}>
         <BatchMeshes geos={seatGeo} shadows={false} name="rowrig-seat" />
       </group>
@@ -425,6 +427,3 @@ const needleMat = () => cachedMat('needle', () => new THREE.MeshStandardMaterial
 const chainMat = () => cachedMat('chain', () => new THREE.MeshStandardMaterial({ color: '#8d979a', roughness: 0.4, metalness: 0.8 }))
 const tetherMat = () => cachedMat('tether', () => new THREE.MeshStandardMaterial({ color: '#e57d35', roughness: 0.8 }))
 const wireMat = () => cachedMat('wire', () => new THREE.MeshStandardMaterial({ color: '#2a2d30', roughness: 0.8 }))
-
-/** Set by the annex root (shared sign material); avoids threading it through props twice. */
-export const SIGN_MAT_PLACEHOLDER: { current: THREE.Material | null } = { current: null }

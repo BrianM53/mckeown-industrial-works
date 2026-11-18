@@ -21,11 +21,11 @@ const CENTER_Z = ANCHORS.employeeWall.position[1]
 const INTERACT = ANCHORS.employeeWall.interact as [number, number]
 
 const JOKES = [
-  'Employee of the Month: Gary, forklift operations. Again. He would like to go home now.',
-  'Six months running. Gary is the only one with a forklift licence, so he is also the only candidate.',
+  'Employee of the Month: Dale, forklift operations. Again. He would like to go home now.',
+  'Six months running. Dale is the only one with a forklift licence, so he is also the only candidate.',
   'Every photo was taken at the end of a double shift. You can tell by the eyes.',
-  "Gary's prize is a reserved parking spot. He has not left the building long enough to use it.",
-  'HR confirms the vote was fair. Gary was the only one awake for it.',
+  "Dale's prize is a reserved parking spot. He has not left the building long enough to use it.",
+  'HR confirms the vote was fair. Dale was the only one awake for it.',
 ]
 
 /** Frame layout on the wall: 2 rows × 3 columns (z = along the wall, y = height). */
@@ -86,7 +86,6 @@ export function EmployeeWall({ atlas, signMaterial, shadows }: { atlas: Atlas; s
       looks.current++
       events.emit('toast', { text, kind: 'info', duration: 6 })
       events.emit('achievement', { id: 'employee-of-month' })
-      events.emit('sfx', { name: 'interact', position: [WALL_X - 0.3, 1.8, CENTER_Z] })
     },
   })
 

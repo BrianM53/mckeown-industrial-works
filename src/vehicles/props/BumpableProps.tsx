@@ -21,7 +21,7 @@ import { useSettings } from '@/state/settings'
 import { PROPS } from '../constants'
 import type { PuffPool } from '../fx/Puffs'
 import { capPlanar } from '../logic/drive'
-import { propRule } from '../logic/propRules'
+import { propRule, type PropSnapshot } from '../logic/propRules'
 import { PROP_KINDS, PROP_SPOTS, spotsOfKind, type PropKind, type PropSpot } from './propData'
 import { propGeometry, propMaterial } from './propGeometry'
 
@@ -37,6 +37,10 @@ const KINDS: PropKind[] = ['box', 'boxSmall', 'crate', 'cone', 'barrel', 'pallet
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const _q = new THREE.Quaternion()
 const _up = new THREE.Vector3()
+const _planar = { x: 0, z: 0 }
+const _snap: PropSnapshot = { x: 0, y: 0, z: 0, up: 1, homeX: 0, homeY: 0, homeZ: 0, playerX: 0, playerZ: 0 }
+/** Distance from the forklift origin that covers its whole footprint (fork tips are 2.18 m ahead). */
+const FORKLIFT_CLEAR = 2.4
 
 interface PropRec {
   spot: PropSpot
@@ -126,7 +130,9 @@ class PropSystem {
         const lv = b.linvel()
         const av = b.angvel()
         let changed = false
-        const planar = { x: lv.x, z: lv.z }
+        const planar = _planar
+        planar.x = lv.x
+        planar.z = lv.z
         if (capPlanar(planar, PROPS.maxSpeed)) changed = true
         const vy = Math.min(lv.y, PROPS.maxSpeed)
         if (vy !== lv.y) changed = true
@@ -231,14 +237,26 @@ class PropSystem {
     const step = this.tickAcc
     this.tickAcc = 0
     const p = runtime.player.position
+    const f = runtime.forklift.position
+    const snap = _snap
+    snap.playerX = p.x
+    snap.playerZ = p.z
     for (const rec of this.recs) {
-      const r = propRule(
-        { x: rec.x, y: rec.y, z: rec.z, up: rec.up, homeX: rec.home.x, homeY: rec.home.y, homeZ: rec.home.z, playerX: p.x, playerZ: p.z },
-        rec.displacedFor,
-        step,
-      )
+      snap.x = rec.x
+      snap.y = rec.y
+      snap.z = rec.z
+      snap.up = rec.up
+      snap.homeX = rec.home.x
+      snap.homeY = rec.home.y
+      snap.homeZ = rec.home.z
+      const r = propRule(snap, rec.displacedFor, step)
       rec.displacedFor = r.displacedFor
-      if (r.verdict === 'reset' || r.verdict === 'reset-now') this.reset(rec, r.verdict === 'reset-now')
+      if (r.verdict === 'reset-now') this.reset(rec, true)
+      else if (r.verdict === 'reset') {
+        // never pop a prop back into the parked forklift: try again on a later tick
+        if (Math.hypot(f.x - rec.home.x, f.z - rec.home.z) < rec.radius + FORKLIFT_CLEAR) rec.displacedFor = PROPS.resetAfter
+        else this.reset(rec, false)
+      }
     }
   }
 

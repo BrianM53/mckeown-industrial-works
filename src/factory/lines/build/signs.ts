@@ -235,7 +235,7 @@ function cellDefs(): CellDef[] {
       { text: 'QUALITY CONTROL', size: 56 },
       { text: 'ALL PAYLOADS AND PERSONNEL ARE SCANNED', size: 18, font: FONT_MONO, weight: 600 },
     ], { stripes: true }),
-    textCell('arch:rejected', 384, 96, '#2a0d0b', '#ff4a3a', [{ text: 'REJECTED', size: 70 }], { border: '#5a1a14' }),
+    textCell('arch:rejected', 384, 96, '#1f0a09', '#8a2d24', [{ text: 'REJECTED', size: 70 }], { border: '#5a1a14' }),
     textCell('arch:passed', 384, 96, '#0c2414', '#5dff7a', [{ text: 'SCANNING…', size: 64 }], { border: '#16402a' }),
     ...ids.map(plaque),
     textCell('bin:rejects', 250, 96, '#C8443A', CREAM, [

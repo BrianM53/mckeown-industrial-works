@@ -107,8 +107,15 @@ export interface PrintPose {
 
 export const WINDUP_ARM = -0.11
 
-export function poseAt(variant: PrintVariant, t: number): PrintPose {
-  const tl = timeline(variant)
+const TIMELINES: Record<PrintVariant, Timeline> = { normal: timeline('normal'), shred: timeline('shred') }
+
+export function blankPose(): PrintPose {
+  return { motor: 0, keeperFeed: 0, decoyFeed: 0, suck: 0, tube: -1, shred: 0, arm: 0, squash: 0, stamped: false, beacons: false, done: false }
+}
+
+/** Machine pose at sequence time t. Writes into `out` when given (no per-frame allocation). */
+export function poseAt(variant: PrintVariant, t: number, out: PrintPose = blankPose()): PrintPose {
+  const tl = TIMELINES[variant]
   const up = easeOut(prog(tl.motorUp, t))
   const down = prog(tl.motorDown, t)
   const motor = t < 0 ? 0 : Math.max(0, Math.min(up, 1 - down))
@@ -132,19 +139,18 @@ export function poseAt(variant: PrintVariant, t: number): PrintPose {
     shred = Math.min(1, k * 8) * Math.min(1, (1 - k) * 5)
   }
 
-  return {
-    motor,
-    keeperFeed: easeOut(prog(tl.keeperFeed, t)),
-    decoyFeed: tl.decoyFeed ? easeOut(prog(tl.decoyFeed, t)) : 0,
-    suck: tl.suck ? easeInOut(prog(tl.suck, t)) : 0,
-    tube: tubeP,
-    shred,
-    arm,
-    squash,
-    stamped: t >= tl.impact,
-    beacons: t >= 0 && t < tl.motorDown.b,
-    done: t >= tl.duration,
-  }
+  out.motor = motor
+  out.keeperFeed = easeOut(prog(tl.keeperFeed, t))
+  out.decoyFeed = tl.decoyFeed ? easeOut(prog(tl.decoyFeed, t)) : 0
+  out.suck = tl.suck ? easeInOut(prog(tl.suck, t)) : 0
+  out.tube = tubeP
+  out.shred = shred
+  out.arm = arm
+  out.squash = squash
+  out.stamped = t >= tl.impact
+  out.beacons = t >= 0 && t < tl.motorDown.b
+  out.done = t >= tl.duration
+  return out
 }
 
 export type CueKind = 'whir' | 'whoosh' | 'shred' | 'stamp' | 'done'

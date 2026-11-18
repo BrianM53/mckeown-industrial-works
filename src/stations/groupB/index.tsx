@@ -8,6 +8,7 @@
  */
 import { use } from 'react'
 import { RecYard } from './rec/RecYard'
+import { RndAnnex } from './rnd/RndAnnex'
 import { loadStationFonts } from './shared/fonts'
 import { useLampDimmer } from './shared/hooks'
 import { ServerHall } from './server/ServerHall'
@@ -19,6 +20,7 @@ export default function StationsB() {
     <group name="stations-b">
       <ServerHall />
       <RecYard />
+      <RndAnnex />
     </group>
   )
 }

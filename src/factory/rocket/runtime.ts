@@ -22,6 +22,7 @@ import {
   CUSHION,
   CUSHION_SIZE,
   DECK_Y,
+  KIOSK,
   PAD_X,
   PAD_Z,
   QUALITY,
@@ -103,6 +104,11 @@ const TOWER_ARM = (() => {
   const dz = czp - hz
   return { x: hx, z: hz, length: Math.hypot(dx, dz) - 0.3, connected: Math.atan2(-dz, dx), retracted: Math.PI / 2 }
 })()
+
+/** Did time move across `t` this frame? */
+function crossed(prev: number, now: number, t: number): boolean {
+  return prev < t && now >= t
+}
 
 interface Follower {
   x: number
@@ -201,6 +207,7 @@ export class RocketRuntime {
   private crane: CraneState = createCraneState()
   plan: FlightPlan | null = null
   private planBuiltFor = ''
+  private planInputs = { id: -1, seed: -1, outcome: '' as string, reduced: false, stowaway: false, debris: -1 }
   private time = 0
   private prevT = 1e9
   private prevSimT = 0
@@ -581,6 +588,10 @@ export class RocketRuntime {
       this.prevTargetS = target
       this.trInit = true
     }
+    // A debug time jump / phase skip moves the target farther in one frame than
+    // the crawler could ever drive: follow it (keeping any visitor-caused lag).
+    const jump = target - this.prevTargetS
+    if (Math.abs(jump) > 2.5) this.trS = this.trBlocked ? clamp(this.trS + jump, 0, L) : target
     // the rocket must be on the pad from the countdown on: no waiting any more
     const urgent = r.phase === 'countdown' || r.phase === 'ignition' || r.phase === 'flight'
     if ((r.phase === 'ignition' || r.phase === 'flight') && Math.abs(target - this.trS) > 0.5) this.trS = target
@@ -652,6 +663,15 @@ export class RocketRuntime {
       }
       return
     }
+    // cheap per-frame check (no allocation) before building the key string
+    const pk = this.planInputs
+    if (this.plan && pk.id === r.id && pk.seed === r.seed && pk.outcome === outcome && pk.reduced === this.reduced && pk.stowaway === r.stowaway && pk.debris === this.q.debris) return
+    pk.id = r.id
+    pk.seed = r.seed
+    pk.outcome = outcome
+    pk.reduced = this.reduced
+    pk.stowaway = r.stowaway
+    pk.debris = this.q.debris
     const input = {
       height: this.model.height,
       tapedFinPivot: this.model.tapedFinPivot,
@@ -662,7 +682,7 @@ export class RocketRuntime {
       stowaway: r.stowaway,
     }
     const key = `${r.id}:${planKey(r.seed, outcome, input)}`
-    if (key === this.planBuiltFor) return
+    if (key === this.planBuiltFor && this.plan) return
     this.plan = buildFlightPlan(r.seed, outcome, input)
     this.planBuiltFor = key
     this.fx.plan = this.plan
@@ -737,10 +757,11 @@ export class RocketRuntime {
     for (let i = 0; i < this.chunkMeshes.length; i++) this.chunkMeshes[i].visible = false
     if (plan && r.phase !== 'assembling' && tau >= plan.revealAt) {
       if (plan.outcome === 'breakup') {
-        plan.chunks.forEach((tr, i) => {
+        for (let i = 0; i < plan.chunks.length; i++) {
+          const tr = plan.chunks[i]
           const isFin = i >= this.chunkMeshes.length
           const mesh = isFin ? this.tapedFin : this.chunkMeshes[i]
-          if (!mesh) return
+          if (!mesh) continue
           const pv = isFin ? model.tapedFinPivot : model.chunks[i].pivot
           const sc = evalTrack(tr, tau - tr.t0, _v, _q)
           _m.compose(_v, _q, _s.setScalar(Math.max(0.001, sc)))
@@ -748,7 +769,7 @@ export class RocketRuntime {
           mesh.matrix.copy(_m)
           mesh.matrixWorldNeedsUpdate = true
           mesh.visible = sc > 0.001
-        })
+        }
       } else if (plan.outcome === 'explosion' && plan.hero) {
         const hi = Math.min(2, this.chunkMeshes.length - 1)
         const mesh = this.chunkMeshes[hi]
@@ -926,14 +947,16 @@ export class RocketRuntime {
     // arms: 2 on the tower, 2 on the pad mast
     const arms = this.arms
     if (arms) {
-      UMBILICAL_LEVELS.forEach((y, i) => {
+      for (let i = 0; i < UMBILICAL_LEVELS.length; i++) {
+        const y = UMBILICAL_LEVELS[i]
         const ext = armExtension(i, y, r.phase, r.phaseTime, model.stageInfo, r.stagesComplete)
         const yawA = TOWER_ARM.retracted + (TOWER_ARM.connected - TOWER_ARM.retracted) * smoothstep(0, 1, ext)
         _q.setFromAxisAngle(Y, yawA)
         _m.compose(_v.set(TOWER_ARM.x, y, TOWER_ARM.z), _q, _one)
         arms.setMatrixAt(i, _m)
-      })
-      this.padArmHinges.forEach((h, i) => {
+      }
+      for (let i = 0; i < this.padArmHinges.length; i++) {
+        const h = this.padArmHinges[i]
         let ext = 0
         if (r.phase === 'pad') ext = smoothstep(1.0, 3.5, r.phaseTime)
         else if (r.phase === 'countdown') ext = 1 - smoothstep(2.5 + i * 0.4, 4.2 + i * 0.4, r.phaseTime)
@@ -942,7 +965,7 @@ export class RocketRuntime {
         _s.set(h.length / TOWER_ARM.length, 1, 1)
         _m.compose(_v.set(h.pos[0], h.pos[1], h.pos[2]), _q, _s)
         arms.setMatrixAt(2 + i, _m)
-      })
+      }
       arms.instanceMatrix.needsUpdate = true
     }
   }
@@ -1078,27 +1101,37 @@ export class RocketRuntime {
     return 0.22 + 0.9 * Math.pow(d, 6)
   }
 
+  private haloNight = 1
+
+  /** One halo sprite (no closure: called many times per frame). */
+  private halo(glow: ParticleBuffer, x: number, y: number, z: number, size: number, c: THREE.Color, k: number): void {
+    if (k > 0.01) glow.push(x, y, z, size, Math.min(1, k * this.haloNight), 0, c.r, c.g, c.b)
+  }
+
+  private haloV3(glow: ParticleBuffer, p: V3, size: number, c: THREE.Color, k: number): void {
+    this.halo(glow, p[0], p[1], p[2], size, c, k)
+  }
+
   private pushHalos(glow: ParticleBuffer, camera: THREE.Camera): void {
-    const night = 1 + (1 - clamp(runtime.lighting.level, 0, 1)) * 0.8
+    this.haloNight = 1 + (1 - clamp(runtime.lighting.level, 0, 1)) * 0.8
     const av = blinkLevels[BLINK.aviation]
-    const push = (p: V3 | THREE.Vector3, size: number, c: THREE.Color, k: number) => {
-      const x = Array.isArray(p) ? p[0] : p.x
-      const y = Array.isArray(p) ? p[1] : p.y
-      const z = Array.isArray(p) ? p[2] : p.z
-      if (k > 0.01) glow.push(x, y, z, size, Math.min(1, k * night), 0, c.r, c.g, c.b)
-    }
-    for (const p of this.towerAviation) push(p, 1.3, AVIATION, av * 0.85)
-    for (const p of this.padAviation) push(p, 1.1, AVIATION, av * 0.85)
+    for (const p of this.towerAviation) this.haloV3(glow, p, 1.3, AVIATION, av * 0.85)
+    for (const p of this.padAviation) this.haloV3(glow, p, 1.1, AVIATION, av * 0.85)
     // crane lights ride on the jib
     this.jib.updateMatrixWorld()
-    push(_v.set(this.jibTip[0], this.jibTip[1], this.jibTip[2]).applyMatrix4(this.jib.matrixWorld), 1.2, AVIATION, av * 0.85)
-    push(_v.set(this.jibApex[0], this.jibApex[1], this.jibApex[2]).applyMatrix4(this.jib.matrixWorld), 1.0, AVIATION, av * 0.7)
-    for (const f of this.towerFloods) push(f.pos, 1.5, WARM, 0.32)
-    for (const p of this.signLamps) push(p, 1.0, WARM, 0.45)
+    _v.set(this.jibTip[0], this.jibTip[1], this.jibTip[2]).applyMatrix4(this.jib.matrixWorld)
+    this.halo(glow, _v.x, _v.y, _v.z, 1.2, AVIATION, av * 0.85)
+    _v.set(this.jibApex[0], this.jibApex[1], this.jibApex[2]).applyMatrix4(this.jib.matrixWorld)
+    this.halo(glow, _v.x, _v.y, _v.z, 1.0, AVIATION, av * 0.7)
+    for (const f of this.towerFloods) this.haloV3(glow, f.pos, 1.5, WARM, 0.32)
+    for (const p of this.signLamps) this.haloV3(glow, p, 1.0, WARM, 0.45)
     // pad beacons: rotating amber "lighthouse" flashes while a launch is on
     const padOn = blinkLevels[BLINK.padBeacon]
     if (padOn > 0.2) {
-      this.padBeacons.forEach((p, i) => push(p, 1.9, AMBER, padOn * this.haloLighthouse(p[0], p[2], camera, 5.5, i * 1.7)))
+      for (let i = 0; i < this.padBeacons.length; i++) {
+        const p = this.padBeacons[i]
+        this.haloV3(glow, p, 1.9, AMBER, padOn * this.haloLighthouse(p[0], p[2], camera, 5.5, i * 1.7))
+      }
     }
     // transporter beacons while it moves
     const trOn = blinkLevels[BLINK.transporter]
@@ -1106,7 +1139,7 @@ export class RocketRuntime {
       for (let i = 0; i < this.transporterBeacons.length; i++) {
         const b = this.transporterBeacons[i]
         _v.set(b[0], b[1], b[2]).applyMatrix4(this.transporterMatrix)
-        push(_v, 1.5, AMBER, this.haloLighthouse(_v.x, _v.z, camera, 6.5, i * 2.3))
+        this.halo(glow, _v.x, _v.y, _v.z, 1.5, AMBER, this.haloLighthouse(_v.x, _v.z, camera, 6.5, i * 2.3))
       }
     }
     // guidance ring chase lights (only once the guidance ring is on the rocket)
@@ -1117,10 +1150,11 @@ export class RocketRuntime {
         const l = m.lights[i]
         _v.set(l.pos[0], l.pos[1], l.pos[2]).applyMatrix4(g.matrix)
         _c.set(l.color)
-        push(_v, 0.55, _c, blinkLevels[BLINK.guidance0 + i] * 0.75)
+        this.halo(glow, _v.x, _v.y, _v.z, 0.55, _c, blinkLevels[BLINK.guidance0 + i] * 0.75)
       }
     }
-    push(_v.set(-5.75 + 0.3, 1.5, -5.85), 0.4, GREEN, av * 0.6)
+    // kiosk "ready" lamp
+    this.halo(glow, KIOSK[0] + 0.3, 1.5, KIOSK[1], 0.4, GREEN, av * 0.6)
   }
 
   // ------------------------------------------------------------ blink, light
@@ -1171,8 +1205,9 @@ export class RocketRuntime {
       const a = tau - fb.at
       if (a >= 0 && a < 1.6) {
         L.position.set(fb.center[0], fb.center[1], fb.center[2])
-        const peak = this.reduced ? 10 : 140
-        intensity = Math.max(intensity, peak * Math.exp(-a / 0.35))
+        // reduced motion: a slow warm swell instead of a flash
+        const k = this.reduced ? 6 * Math.sin(Math.PI * Math.min(1, a / 1.6)) : 140 * Math.exp(-a / 0.35)
+        intensity = Math.max(intensity, k)
       }
     }
     L.intensity = Number.isFinite(intensity) ? intensity : 0
@@ -1206,36 +1241,30 @@ export class RocketRuntime {
     const prev = this.prevT
     const jump = T - prev
     if (!(jump > 0) || jump > 1.0) return
-    const crossed = (t: number) => prev < t && T >= t
-    const pad: [number, number, number] = [PAD_X, 1.5, PAD_Z]
-    if (crossed(0.6)) events.emit('sfx', { name: 'steam-hiss', position: pad, volume: 0.8 })
-    if (crossed(6)) events.emit('sfx', { name: 'steam-hiss', position: pad, volume: 0.6, rate: 0.85 })
-    if (crossed(T_LIFTOFF + 0.05)) events.emit('sfx', { name: 'machine-clank', position: pad, volume: 0.9 })
+    if (crossed(prev, T, 0.6)) events.emit('sfx', { name: 'steam-hiss', position: [PAD_X, 1.5, PAD_Z], volume: 0.8 })
+    if (crossed(prev, T, 6)) events.emit('sfx', { name: 'steam-hiss', position: [PAD_X, 1.5, PAD_Z], volume: 0.6, rate: 0.85 })
+    if (crossed(prev, T, T_LIFTOFF + 0.05)) events.emit('sfx', { name: 'machine-clank', position: [PAD_X, 1.5, PAD_Z], volume: 0.9 })
     const plan = this.plan
     if (!plan) return
     const tau0 = prev - T_LIFTOFF
     const tau1 = T - T_LIFTOFF
-    const crossedTau = (t: number) => tau0 < t && tau1 >= t
     if (plan.stowaway) {
-      if (crossedTau(STOWAWAY.detach)) events.emit('sfx', { name: 'steam-hiss', position: [CUSHION[0], 0.8, CUSHION[1]], volume: 0.9, rate: 1.3 })
-      if (crossedTau(STOWAWAY.detach + STOWAWAY.flight)) events.emit('sfx', { name: 'boing', position: [CUSHION[0], CUSHION_SIZE.h, CUSHION[1]], volume: 1 })
+      if (crossed(tau0, tau1, STOWAWAY.detach)) events.emit('sfx', { name: 'steam-hiss', position: [CUSHION[0], 0.8, CUSHION[1]], volume: 0.9, rate: 1.3 })
+      if (crossed(tau0, tau1, STOWAWAY.detach + STOWAWAY.flight)) events.emit('sfx', { name: 'boing', position: [CUSHION[0], CUSHION_SIZE.h, CUSHION[1]], volume: 1 })
     }
-    if (plan.outcome === 'wobble' && crossedTau(plan.revealAt)) {
-      _v.set(0, 2, 0).applyMatrix4(this.rocketMatrix)
-      events.emit('sfx', { name: 'machine-clank', position: [_v.x, _v.y, _v.z], volume: 1, rate: 0.8 })
-    }
-    if ((plan.outcome === 'success' || plan.outcome === 'wobble') && crossedTau(plan.revealAt + 0.3)) {
+    // (the wobble's fin clatter at the reveal is the audio module's 'rocket:outcome' sound)
+    if ((plan.outcome === 'success' || plan.outcome === 'wobble') && crossed(tau0, tau1, plan.revealAt + 0.3)) {
       const d = CREW_DEFS[0].safe
       events.emit('sfx', { name: 'cheer', position: [d[0], 1.5, d[1]], volume: 0.6 })
     }
     let n = 0
     for (const l of this.landings) {
-      if (crossedTau(l.tau) && n < 3) {
+      if (crossed(tau0, tau1, l.tau) && n < 3) {
         n++
         events.emit('sfx', { name: l.big ? 'breakup-clank' : 'crate-bump', position: [l.x, 0.3, l.z], volume: l.big ? 0.7 : 0.5, rate: l.big ? 1.25 : 1 })
       }
     }
-    if (crossedTau(TAU_CLEANUP + 0.2) && (plan.outcome !== 'success' || plan.fin)) events.emit('sfx', { name: 'steam-hiss', position: pad, volume: 0.5, rate: 1.4 })
+    if (crossed(tau0, tau1, TAU_CLEANUP + 0.2) && (plan.outcome !== 'success' || plan.fin)) events.emit('sfx', { name: 'steam-hiss', position: [PAD_X, 1.5, PAD_Z], volume: 0.5, rate: 1.4 })
   }
 
   // ------------------------------------------------------------ debug

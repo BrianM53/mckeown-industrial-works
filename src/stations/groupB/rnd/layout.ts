@@ -63,6 +63,14 @@ export const DNP = {
   resetAfter: 60,
 }
 
+/** Hatch / keep-clear geometry around the second button (local half sizes, m). */
+export const DNP_GEOM = { half: 0.42, frame: 0.07, bollardHalf: 0.66 }
+
+/** Where the visitor stands to press button 1 or 2 (just east of each pedestal / bollard square). */
+export function dnpInteractPoint(which: 1 | 2): { x: number; z: number } {
+  return which === 1 ? { x: DNP.b1.x + 0.78, z: DNP.b1.z } : { x: DNP.b2.x + DNP_GEOM.bollardHalf + 0.42, z: DNP.b2.z }
+}
+
 /** Annex directory board just inside the door, angled toward the entrance. */
 export const INFO_BOARD = { x: -32.4, z: -36.85, yaw: -2.45, w: 1.5, h: 1.0, y0: 0.9 }
 export const INFO_INTERACT: Vec2 = [-32.0, -35.6]

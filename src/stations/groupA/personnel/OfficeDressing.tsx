@@ -57,6 +57,7 @@ function buildDressing(atlas: Atlas): Builder {
 
 const HAND_GEO = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0)
 const _m = new THREE.Matrix4()
+const _now = new Date()
 const _q = new THREE.Quaternion()
 const _p = new THREE.Vector3()
 const _s = new THREE.Vector3()
@@ -117,7 +118,8 @@ export function OfficeDressing({ atlas, signMaterial, shadows }: { atlas: Atlas;
     const interval = d < 14 && !reduced ? 1 / 20 : 0.5
     if (last.acc < interval) return
     last.acc = 0
-    setClockHands(hands, new Date(), reduced)
+    _now.setTime(Date.now())
+    setClockHands(hands, _now, reduced)
   })
 
   return (

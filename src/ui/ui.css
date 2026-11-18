@@ -883,6 +883,16 @@
   .miw-dialogue__fiction-long {
     display: none;
   }
+  /* role on its own line under the name (fits beside the 38px close button) */
+  .miw-dialogue__who {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+  .miw-dialogue__role {
+    max-width: 100%;
+    white-space: normal;
+  }
 }
 .miw-dialogue__close {
   display: grid;
@@ -1460,15 +1470,21 @@
   font: 700 1.08rem/1 var(--font-display);
   letter-spacing: 0.06em;
 }
+/* up to two balanced lines ("Contact Tube / (Say Hello)") before clamping: the 74px pill has room */
 .miw-tbtn__target {
+  display: -webkit-box;
   max-width: 100%;
   margin-top: 3px;
   overflow: hidden;
   font: 600 0.76rem/1.2 var(--font-body);
   letter-spacing: 0;
-  text-overflow: ellipsis;
+  text-align: left;
   text-transform: none;
-  white-space: nowrap;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .miw-tbtn--horn {
   border-color: var(--c-safety);

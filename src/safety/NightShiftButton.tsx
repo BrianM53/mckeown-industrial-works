@@ -15,7 +15,7 @@ import { director } from '@/systems/director'
 import { mats, textures } from '@/world/materials'
 import { PALETTE } from '@/world/palette'
 import { setStatus, signArt, statusArt } from './art'
-import { NIGHT_BUTTON } from './config'
+import { NIGHT, NIGHT_BUTTON } from './config'
 import { easeOutCubic, partMatrix, PartBuilder, vertexColorMat, type V3 } from './geometry'
 import { NightShiftFsm } from './nightShift'
 
@@ -225,7 +225,21 @@ export function NightShiftSystem() {
 const READY = '#5DFF7A'
 const AMBER = '#FFB23F'
 const RED = '#FF3B2F'
-const _c = new THREE.Color()
+const C_READY = new THREE.Color(READY)
+const C_AMBER = new THREE.Color(AMBER)
+const C_RED = new THREE.Color(RED)
+const C_GLOW_ACTIVE = new THREE.Color('#FF3B26')
+const C_GLOW_IDLE = new THREE.Color('#FF5A3A')
+/** Pre-built status strings (no per-frame string building). */
+const RECHARGE_TEXT = Array.from({ length: Math.ceil(NIGHT.cooldown + NIGHT.blackout + 2 * NIGHT.gentleFade) + 2 }, (_, i) => `RECHARGE ${i}s`)
+/** Minimum seconds between two "still recharging" toasts. */
+const DUD_TOAST_GAP = 3
+
+/** Prompt label while the button cannot be pressed (the visitor still sees why). */
+function busyLabel(fsm: NightShiftFsm): string {
+  if (fsm.isActive()) return `${NIGHT_BUTTON.label} (lights out)`
+  return `${NIGHT_BUTTON.label} (recharging, ${Math.ceil(fsm.cooldownRemaining())} s)`
+}
 
 function NightShiftButton({ fsm }: { fsm: NightShiftFsm }) {
   const anchor = NIGHT_BUTTON.anchor
@@ -237,7 +251,7 @@ function NightShiftButton({ fsm }: { fsm: NightShiftFsm }) {
   const coverRef = useRef<THREE.Group>(null)
   const glowRef = useRef<THREE.Sprite>(null)
   const signRef = useRef<THREE.Group>(null)
-  const press = useRef({ t: -1 })
+  const press = useRef({ t: -1, dud: -1, lastDudToast: -Infinity })
   const clock = useRef(0)
 
   const own = useMemo(() => {
@@ -286,14 +300,13 @@ function NightShiftButton({ fsm }: { fsm: NightShiftFsm }) {
     if (s) s.userData.cameraFade = true
   }, [])
 
-  // E-interaction: "Press — Night Shift button" (disabled while running / recharging).
+  // E-interaction: "Press — Night Shift button" (enabled() false while running / recharging).
   const def = useMemo<Interactable>(
     () => ({
       id: 'safety:night-shift-button',
       verb: NIGHT_BUTTON.verb,
       get label() {
-        if (fsm.phase === 'idle') return NIGHT_BUTTON.label
-        return `${NIGHT_BUTTON.label} (recharging, ${Math.ceil(fsm.cooldownRemaining())} s)`
+        return fsm.phase === 'idle' ? NIGHT_BUTTON.label : busyLabel(fsm)
       },
       radius: 2.4,
       priority: 1,
@@ -302,6 +315,7 @@ function NightShiftButton({ fsm }: { fsm: NightShiftFsm }) {
       onInteract: () => {
         if (!fsm.canStart()) return
         press.current.t = 0
+        press.current.dud = -1
         events.emit('sfx', { name: 'big-button', position: [anchor.position[0], 1.1, anchor.position[1]] })
         if (!fsm.start()) events.emit('toast', { text: NIGHT_BUTTON.jammedToast, kind: 'info', duration: 4 })
       },
@@ -309,6 +323,33 @@ function NightShiftButton({ fsm }: { fsm: NightShiftFsm }) {
     [fsm, anchor],
   )
   useInteractable(def)
+  // Disabled targets get no prompt, so while the button is unavailable a status
+  // stand-in takes its place: the prompt shows the remaining recharge seconds and
+  // pressing it only rattles the locked cover.
+  const busyDef = useMemo<Interactable>(
+    () => ({
+      id: 'safety:night-shift-button:busy',
+      verb: NIGHT_BUTTON.verb,
+      get label() {
+        return busyLabel(fsm)
+      },
+      radius: 2.4,
+      priority: 1,
+      getPosition: () => ({ x: anchor.interact[0], y: 0, z: anchor.interact[1] }),
+      enabled: () => fsm.phase !== 'idle',
+      onInteract: () => {
+        const pr = press.current
+        if (pr.t < 0) pr.dud = 0
+        const now = clock.current
+        if (now - pr.lastDudToast < DUD_TOAST_GAP) return
+        pr.lastDudToast = now
+        const text = fsm.isActive() ? NIGHT_BUTTON.busyToast : NIGHT_BUTTON.rechargeToast(Math.ceil(fsm.cooldownRemaining()))
+        events.emit('toast', { text, kind: 'info', duration: 3.5 })
+      },
+    }),
+    [fsm, anchor],
+  )
+  useInteractable(busyDef)
 
   useFrame((_, rawDt) => {
     const dt = Math.min(Math.max(rawDt, 0), 0.1)
@@ -328,28 +369,34 @@ function NightShiftButton({ fsm }: { fsm: NightShiftFsm }) {
       open = T < 0.22 ? easeOutCubic(T / 0.22) : T < 1.35 ? 1 : T < 1.6 ? 1 - ((T - 1.35) / 0.25) ** 2 : 0
       down = T > 0.18 && T < 0.5 ? Math.sin(((T - 0.18) / 0.32) * Math.PI) : 0
       if (T >= 1.6) pr.t = -1
+    } else if (pr.dud >= 0) {
+      // locked: the cover only rattles on its hinge (a small nudge with reduced motion)
+      pr.dud += dt
+      const T = pr.dud
+      open = T < 0.42 ? Math.abs(Math.sin((T / 0.42) * Math.PI * (reduced ? 1 : 3))) * (reduced ? 0.05 : 0.11) * (1 - T / 0.42) : 0
+      if (T >= 0.42) pr.dud = -1
     }
     if (coverRef.current) coverRef.current.rotation.x = open * COVER_OPEN
     if (capRef.current) capRef.current.position.y = BUTTON_LOCAL[1] - down * 0.04
 
     // button lamp + status display + lamp on the sign
-    const cd = fsm.cooldownRemaining()
     let capGlow: number
     if (active) {
       capGlow = 2.3
       setStatus('LIGHTS OUT', RED)
-      own.lamp.emissive.set(RED)
+      own.lamp.emissive.copy(C_RED)
       own.lamp.emissiveIntensity = reduced ? 2 : 1.2 + 1.2 * Math.max(0, Math.sin(t * 5))
     } else if (phase === 'cooldown') {
       const blink = reduced ? 0.55 + 0.45 * Math.sin(t * 2.2) : Math.sin(t * Math.PI * 2) > 0 ? 1 : 0.08
       capGlow = 0.2 + 1.6 * blink
-      setStatus(`RECHARGE ${Math.ceil(cd)}s`, AMBER)
-      own.lamp.emissive.set(AMBER)
+      const s = Math.min(RECHARGE_TEXT.length - 1, Math.max(0, Math.ceil(fsm.cooldownRemaining())))
+      setStatus(RECHARGE_TEXT[s], AMBER)
+      own.lamp.emissive.copy(C_AMBER)
       own.lamp.emissiveIntensity = 0.3 + 1.8 * blink
     } else {
       capGlow = reduced ? 0.75 : 0.6 + 0.3 * Math.sin(t * 2.4)
       setStatus('READY', READY)
-      own.lamp.emissive.set(READY)
+      own.lamp.emissive.copy(C_READY)
       own.lamp.emissiveIntensity = 1.6
     }
     own.button.emissiveIntensity = capGlow
@@ -362,8 +409,7 @@ function NightShiftButton({ fsm }: { fsm: NightShiftFsm }) {
       const s = 0.9 + 0.5 * dark
       glowRef.current.scale.set(s, s, s)
     }
-    _c.set(active ? '#FF3B26' : '#FF5A3A')
-    own.glow.color.copy(_c)
+    own.glow.color.copy(active ? C_GLOW_ACTIVE : C_GLOW_IDLE)
   })
 
   const capPos = useMemo<V3>(() => [BUTTON_LOCAL[0], BUTTON_LOCAL[1], BUTTON_LOCAL[2]], [])

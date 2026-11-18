@@ -172,16 +172,37 @@ const VR_PARK: readonly number[] = [0.7, 2.15, 0.45]
  */
 export function valveRobot(phase: number, out: ToolPose): ToolPose {
   const p = frac(phase)
+  // (plain assignments: this runs every frame, no temporary arrays)
   let a = VR_PARK
   let b = VR_PARK
   let k = 0
-  if (p < 0.12) [a, b, k] = [VR_PARK, VR_BIN_UP, easeInOut(p / 0.12)]
-  else if (p < 0.2) [a, b, k] = [VR_BIN_UP, VR_BIN, easeInOut((p - 0.12) / 0.08)]
-  else if (p < 0.28) [a, b, k] = [VR_BIN, VR_BIN_UP, easeInOut((p - 0.2) / 0.08)]
-  else if (p < 0.48) [a, b, k] = [VR_BIN_UP, VR_BELT_UP, easeInOut((p - 0.28) / 0.2)]
-  else if (p < 0.58) [a, b, k] = [VR_BELT_UP, VR_BELT, easeInOut((p - 0.48) / 0.1)]
-  else if (p < 0.66) [a, b, k] = [VR_BELT, VR_BELT_UP, easeInOut((p - 0.58) / 0.08)]
-  else if (p < 0.86) [a, b, k] = [VR_BELT_UP, VR_PARK, easeInOut((p - 0.66) / 0.2)]
+  if (p < 0.12) {
+    b = VR_BIN_UP
+    k = easeInOut(p / 0.12)
+  } else if (p < 0.2) {
+    a = VR_BIN_UP
+    b = VR_BIN
+    k = easeInOut((p - 0.12) / 0.08)
+  } else if (p < 0.28) {
+    a = VR_BIN
+    b = VR_BIN_UP
+    k = easeInOut((p - 0.2) / 0.08)
+  } else if (p < 0.48) {
+    a = VR_BIN_UP
+    b = VR_BELT_UP
+    k = easeInOut((p - 0.28) / 0.2)
+  } else if (p < 0.58) {
+    a = VR_BELT_UP
+    b = VR_BELT
+    k = easeInOut((p - 0.48) / 0.1)
+  } else if (p < 0.66) {
+    a = VR_BELT
+    b = VR_BELT_UP
+    k = easeInOut((p - 0.58) / 0.08)
+  } else if (p < 0.86) {
+    a = VR_BELT_UP
+    k = easeInOut((p - 0.66) / 0.2)
+  }
   out.f = a[0] + (b[0] - a[0]) * k
   out.u = a[1] + (b[1] - a[1]) * k
   out.r = a[2] + (b[2] - a[2]) * k
@@ -197,8 +218,12 @@ export function valveRobot(phase: number, out: ToolPose): ToolPose {
 export function ik2(d: number, h: number, l1: number, l2: number, out: [number, number]): [number, number] {
   const minR = Math.abs(l1 - l2) + 1e-3
   const maxR = l1 + l2 - 1e-3
-  let r = Math.hypot(d, h)
-  if (!Number.isFinite(r)) r = maxR
+  if (!Number.isFinite(d) || !Number.isFinite(h)) {
+    // bad target (NaN upstream): stand the arm straight up rather than poisoning the skeleton
+    d = 0
+    h = maxR
+  }
+  const r = Math.hypot(d, h)
   const rc = Math.min(maxR, Math.max(minR, r))
   const alpha = Math.atan2(d, h)
   const cosB = (l1 * l1 + rc * rc - l2 * l2) / (2 * l1 * rc)
@@ -414,13 +439,16 @@ export interface RejectPose {
 export const REJECT_TIMES = { release: 0.42, slide: 1.05, land: 1.5, settle: 1.95 } as const
 
 /** Rest position of the n-th pod in the reject bin (center of the pod body). */
+const REJECT_SLOTS: ReadonlyArray<readonly [number, number, number, number, number]> = [
+  [0, 0, 0, 0.08, -0.12],
+  [-0.42, 0.02, 0.38, -0.2, 0.15],
+  [0.32, 0.04, -0.38, 0.35, 0.05],
+  [-0.12, 0.42, -0.02, 1.2, 0.3],
+]
+const restTmp: RejectPose = { x: 0, y: 0, z: 0, rx: 0, rz: 0 }
+
 export function rejectSlot(n: number, out: RejectPose): RejectPose {
-  const SLOTS: Array<[number, number, number, number, number]> = [
-    [0, 0, 0, 0.08, -0.12],
-    [-0.42, 0.02, 0.38, -0.2, 0.15],
-    [0.32, 0.04, -0.38, 0.35, 0.05],
-    [-0.12, 0.42, -0.02, 1.2, 0.3],
-  ]
+  const SLOTS = REJECT_SLOTS
   const s = SLOTS[((n % SLOTS.length) + SLOTS.length) % SLOTS.length]
   out.x = REJECT.rest[0] + s[0]
   out.y = REJECT.rest[1] + s[1]
@@ -465,7 +493,7 @@ export function rejectPose(t: number, fromY: number, fromZ: number, slot: number
     out.rz = -0.6 - 2.2 * k
     return false
   }
-  const rest = rejectSlot(slot, { x: 0, y: 0, z: 0, rx: 0, rz: 0 })
+  const rest = rejectSlot(slot, restTmp)
   if (t < T.land) {
     const k = (t - T.slide) / (T.land - T.slide)
     out.x = bx + (rest.x - bx) * k

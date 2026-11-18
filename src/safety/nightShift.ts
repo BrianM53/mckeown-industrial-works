@@ -9,8 +9,11 @@
  * Sole writer of runtime.lighting (passed in as `lighting`). HARD GUARANTEES:
  *  - every path back to idle/cooldown writes level 1 / emergency 0;
  *  - `watchdog()` (called from a real-time interval and every frame) restores
- *    normal light if anything is off while not active, or if an event has run
- *    longer than NIGHT.watchdogMaxActive real seconds (paused/stalled clock);
+ *    normal light if anything is off while not active, and ends an event early
+ *    when the sim clock stalls (no progress for NIGHT.watchdogStall real
+ *    seconds: hidden tab, broken frame loop), when the event overruns its sim
+ *    length (FSM no longer ticked), or after NIGHT.watchdogMaxActive real
+ *    seconds no matter what. A merely slow clock (low fps) is not cut short;
  *  - `dispose()` (component unmount, even mid-blackout) restores lighting.
  */
 import type { GameEventName, GameEvents } from '@/core/events'
@@ -67,6 +70,10 @@ export class NightShiftFsm {
   private phaseLen = 0
   private gentle = false
   private startedReal = 0
+  private startedSim = 0
+  /** Watchdog stall detection: last sim time seen and the real time it was seen at. */
+  private lastSimSeen = 0
+  private lastProgressReal = 0
   private paDone = false
   private restorePaDone = true
   private endEmitted = true
@@ -123,6 +130,9 @@ export class NightShiftFsm {
     this.runs++
     this.gentle = this.safeReduced()
     this.startedReal = this.realNow()
+    this.startedSim = this.now()
+    this.lastSimSeen = this.startedSim
+    this.lastProgressReal = this.startedReal
     this.paDone = false
     this.restorePaDone = false
     this.endEmitted = false
@@ -185,7 +195,15 @@ export class NightShiftFsm {
       return true
     }
     if (!this.isActive()) return this.ensureNormal()
-    if (this.realNow() - this.startedReal > NIGHT.watchdogMaxActive) {
+    const real = this.realNow()
+    const sim = this.now()
+    if (sim > this.lastSimSeen) {
+      this.lastSimSeen = sim
+      this.lastProgressReal = real
+    }
+    const stalled = real - this.lastProgressReal > NIGHT.watchdogStall
+    const overran = sim - this.startedSim > this.expectedLength() + NIGHT.watchdogSimMargin
+    if (stalled || overran || real - this.startedReal > NIGHT.watchdogMaxActive) {
       this.forceRestore()
       return true
     }
@@ -276,6 +294,11 @@ export class NightShiftFsm {
     if (this.endEmitted) return
     this.endEmitted = true
     this.deps.emit('nightshift:end', {})
+  }
+
+  /** Sim seconds from start() to the end of the restore fade. */
+  private expectedLength(): number {
+    return (this.gentle ? NIGHT.gentleFade : NIGHT.powerDown) + NIGHT.blackout + this.fadeLen()
   }
 
   private fadeLen(): number {

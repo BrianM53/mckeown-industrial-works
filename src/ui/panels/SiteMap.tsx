@@ -24,6 +24,27 @@ const LABEL_AT: Partial<Record<ZoneId, Vec2>> = {
 
 const round1 = (v: number) => Math.round((Number.isFinite(v) ? v : 0) * 10) / 10
 
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'] as const
+
+/** Compass direction of a point seen from the middle of the site (north = −Z). */
+export function compassFromSiteCentre([x, z]: Vec2): (typeof COMPASS)[number] | 'centre' {
+  const dx = x - (B.minX + B.maxX) / 2
+  const dz = z - (B.minZ + B.maxZ) / 2
+  if (Math.hypot(dx, dz) < 12) return 'centre'
+  const bearing = (Math.atan2(dx, -dz) * 180) / Math.PI // 0 = north, 90 = east
+  return COMPASS[Math.round((bearing + 360) / 45) % 8]
+}
+
+/** Text alternative for the map, derived from layout.ts so it can never disagree with the world. */
+export const SITE_DESCRIPTION: string = (() => {
+  const where = (id: ZoneId) => {
+    const d = compassFromSiteCentre(ZONES[id].center)
+    return d === 'centre' ? 'in the middle' : `to the ${d}`
+  }
+  const principal = ZONE_LIST.filter((z) => z.principal).map((z) => `${z.name} (${z.shortName}) ${where(z.id)}`)
+  return `Schematic map, north up. Portfolio destinations: ${principal.join('; ')}. The rocket tower stands ${where('tower')} and the launch yard lies ${where('launch')}.`
+})()
+
 export interface SiteMapProps {
   showPlayer: boolean
   routeTarget: ZoneId | null
@@ -66,11 +87,7 @@ export function SiteMap({ showPlayer, routeTarget, highlight, onSelectZone, sele
       data-testid="site-map"
     >
       <title id={`${uid}-t`}>Site plan of McKeown Industrial Works</title>
-      <desc id={`${uid}-d`}>
-        Schematic map, north up. Portfolio buildings: Personnel Office (résumé) south-east of the intake, Control Room (Harmony AI) and Server Hall
-        (GitHub) on the west side, Broadcast Booth (Code Story) and Recreation Yard on the east side, the rocket tower in the middle and the
-        launch yard to the north.
-      </desc>
+      <desc id={`${uid}-d`}>{SITE_DESCRIPTION}</desc>
       <defs>
         <pattern id={`${uid}-grid`} width="10" height="10" patternUnits="userSpaceOnUse" x={B.minX} y={B.minZ}>
           <path d="M10 0H0V10" fill="none" stroke="rgba(233,228,214,0.06)" strokeWidth="0.25" />

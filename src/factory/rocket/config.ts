@@ -114,6 +114,8 @@ export const STAIR = { x0: TOWER_CX - TOWER_HALF - 1.45, x1: TOWER_CX - TOWER_HA
 
 export const WITNESS_RANGE = 80
 export const IGNITION_SHAKE = { intensity: 0.35, duration: 1.2 }
+/** Sound caption for the ignition rumble (alternate cue when shake is off). */
+export const IGNITION_CAPTION = '[Rocket engines roar — the ground rumbles]'
 /** Look-ahead (m) in front of the moving transporter that must be clear of the visitor. */
 export const TRACK_CLEARANCE_AHEAD = 4.2
 export const TRACK_CLEARANCE_SIDE = 0.9

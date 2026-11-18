@@ -369,6 +369,9 @@ export class NpcWorld {
   startNightShift(): void {
     this.nightShift = true
     this.nightShiftSince = this.clock
+    // The blackout hides any running gag: end it now (actors snap home) so nobody is
+    // left holding a flashlight half-way through a pratfall.
+    this.abortGags()
     const p = runtime.player.position
     const near: NpcBrain[] = []
     for (const b of this.brains.values()) {

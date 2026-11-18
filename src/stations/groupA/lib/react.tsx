@@ -45,12 +45,15 @@ export function BuiltMeshes({
   receive = true,
   materialFor,
   name,
+  cameraFade = false,
 }: {
   meshes: BuiltMesh[]
   shadows: boolean
   receive?: boolean
   materialFor?: (key: string) => THREE.Material | undefined
   name?: string
+  /** Thin decorative props: the player camera hides them while they block the worker (player/occluders). */
+  cameraFade?: boolean
 }) {
   return (
     <group name={name}>
@@ -62,6 +65,7 @@ export function BuiltMeshes({
           castShadow={shadows && SHADOW_KEYS.has(m.key)}
           receiveShadow={receive && m.key !== 'glow'}
           renderOrder={m.key === 'glass' ? 2 : 0}
+          {...(cameraFade ? { userData: { cameraFade: true } } : null)}
         />
       ))}
     </group>

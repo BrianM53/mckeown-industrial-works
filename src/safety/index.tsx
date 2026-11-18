@@ -6,10 +6,13 @@
  *    investigates NPC mishaps ('gag:start'), and pops out of a safety hatch to
  *    tackle visitors who walk into a restricted zone (OSHA FSM, oshaFsm.ts).
  *  - Night Shift button + blackout FSM (sole writer of runtime.lighting, with a
- *    watchdog that always restores the lights).
+ *    watchdog that always restores the lights). Interactables at
+ *    ANCHORS.nightShiftButton.interact: 'safety:night-shift-button' (Press;
+ *    enabled only when idle) and 'safety:night-shift-button:busy' (enabled while
+ *    running / recharging; its label shows the remaining seconds).
  *  - PA announcer (implausible corporate awards, paced by the director).
  *
- * Debug (dev/test builds): __MIW__.osha.{trigger, getState, reset},
+ * Debug (dev/test builds): __MIW__.osha.{trigger(zoneId?, {force, hatch}), getState, reset, zones},
  * __MIW__.nightShift.{start, getState, restore}, __MIW__.pa.{announce, getState}.
  */
 import { Isolate } from './Isolate'

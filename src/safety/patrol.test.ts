@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Vec2 } from '@/core/types'
 import { PATHS, RESTRICTED_ZONES, TRACK, WAYPOINTS, ZONES, restrictedZoneAt } from '@/world/layout'
 import { HATCHES, HATCH_SIZE, OSHA, PATROL, PATROL_ROUTE } from './config'
-import { InspectorBrain, createActor } from './patrol'
+import { InspectorBrain, createActor, legClearOfZones } from './patrol'
 import { ZONE_TRIGGER_POINTS, nearestZone, zoneSignedDistance } from './zones'
 
 const STEP = 1 / 30
@@ -167,6 +167,30 @@ describe('inspector brain', () => {
     expect(['path', 'route']).toContain(brain.mode)
     // and it is rate limited
     expect(brain.investigate('gag:again', 0, 9)).toBe(false)
+  })
+
+  it('investigating a mishap inside a restricted zone never takes him into the zone', () => {
+    expect(legClearOfZones([9.5, -4], [17.6, -4.6])).toBe(false)
+    expect(legClearOfZones([0, -2.5], [9.5, -4])).toBe(true)
+    // the transformer itself, and a spot just past the wet-paint rectangle
+    for (const gag of [
+      [17.6, -4.6],
+      [-21, -4.5],
+    ] as Vec2[]) {
+      const actor = createActor(0, 0)
+      const brain = new InspectorBrain(actor)
+      for (let i = 0; i < 10; i++) brain.tick(STEP)
+      expect(brain.investigate('gag:zone', gag[0], gag[1])).toBe(true)
+      let t = 0
+      let worst = Infinity
+      while (brain.investigating && t < PATROL.investigateTimeout + 5) {
+        brain.tick(STEP)
+        t += STEP
+        for (const z of RESTRICTED_ZONES) worst = Math.min(worst, zoneSignedDistance(z, actor.x, actor.z))
+      }
+      expect(brain.investigating).toBeNull()
+      expect(worst).toBeGreaterThan(0.25)
+    }
   })
 
   it('hold(): faces the target with a head shake, then carries on', () => {

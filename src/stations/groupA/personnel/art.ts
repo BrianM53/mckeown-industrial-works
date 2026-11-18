@@ -122,7 +122,7 @@ export function drawPortrait(ctx: Ctx, w: number, h: number, month: string, tire
   const headY = imgH * 0.44 + tired * 6
   const tilt = (rng() - 0.5) * 0.08 + tired * 0.12 * (seed % 2 ? 1 : -1)
   // shoulders: shirt + hi-vis vest
-  ctx.fillStyle = '#4b5b66'
+  ctx.fillStyle = '#4A3B30'
   roundRect(ctx, cx - w * 0.36, imgH * 0.72, w * 0.72, imgH * 0.4, 40)
   ctx.fill()
   ctx.fillStyle = '#E57D35'
@@ -140,7 +140,7 @@ export function drawPortrait(ctx: Ctx, w: number, h: number, month: string, tire
   ctx.font = font(9, 700)
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText('GARY', cx + w * 0.23, imgH * 0.78 + 6.5)
+  ctx.fillText('DALE', cx + w * 0.23, imgH * 0.78 + 6.5)
 
   ctx.save()
   ctx.translate(cx, headY)
@@ -226,12 +226,12 @@ export function drawPortrait(ctx: Ctx, w: number, h: number, month: string, tire
   ctx.save()
   ctx.translate(0, -44)
   ctx.rotate(-0.06 - tired * 0.32)
-  ctx.fillStyle = '#E9B63F'
+  ctx.fillStyle = '#4F86A8' // Dale's signal-blue hat (npc LOOK_DRIVER)
   ctx.beginPath()
   ctx.ellipse(0, 0, 58, 40, 0, Math.PI, 0)
   ctx.fill()
   ctx.fillRect(-66, -4, 132, 10)
-  ctx.fillStyle = '#c99430'
+  ctx.fillStyle = '#3B6A87'
   ctx.fillRect(-6, -40, 12, 38)
   ctx.restore()
   // hair sticking out
@@ -280,7 +280,7 @@ export function drawPortrait(ctx: Ctx, w: number, h: number, month: string, tire
   ctx.fillStyle = g
   ctx.fillRect(0, py, w, h - py)
   fitText(ctx, month, w / 2, py + 24, w - 30, 30, { color: '#2a2210', tracking: 0.08 })
-  fitText(ctx, 'GARY · FORKLIFT OPERATIONS', w / 2, py + 52, w - 30, 15, { weight: 600, color: '#3a2e14' })
+  fitText(ctx, 'DALE · FORKLIFT OPERATIONS', w / 2, py + 52, w - 30, 15, { weight: 600, color: '#3a2e14' })
 }
 
 // ---------------------------------------------------------------------------

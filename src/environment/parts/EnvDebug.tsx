@@ -11,6 +11,9 @@ import type { BuiltWorld } from './world'
 /**
  * Dev/test hooks (stripped in production by registerDebug):
  *   __MIW__.environment.stats()                  -> renderer + environment counts
+ *   __MIW__.environment.measure()                -> renders one frame with ONLY the environment visible and
+ *                                                   returns its draw calls / triangles (incl. shadow pass)
+ *                                                   next to the whole scene's, for the perf budget
  *   __MIW__.environment.breakdown()              -> triangles per environment mesh (largest first)
  *   __MIW__.environment.setLighting(level, em)   -> force the environment's lighting response (visual-only
  *                                                   override; runtime.lighting stays owned by safety).
@@ -21,7 +24,7 @@ import type { BuiltWorld } from './world'
  */
 export function EnvDebug({ world }: { world: BuiltWorld | null }) {
   const gl = useThree((s) => s.gl)
-  const camera = useThree((s) => s.camera)
+  const get = useThree((s) => s.get)
   const scene = useThree((s) => s.scene)
   useEffect(() => {
     const hasPlayer = () => {
@@ -57,6 +60,42 @@ export function EnvDebug({ world }: { world: BuiltWorld | null }) {
           steamEmitters: world?.steam.length ?? 0,
         }
       },
+      measure: () => {
+        const root = scene.getObjectByName('environment-root')
+        const camera = get().camera
+        if (!root) return null
+        const renderCounts = () => {
+          gl.info.reset()
+          gl.render(scene, camera)
+          return { calls: gl.info.render.calls, triangles: gl.info.render.triangles }
+        }
+        const autoReset = gl.info.autoReset
+        gl.info.autoReset = false
+        const hidden: THREE.Object3D[] = []
+        try {
+          const all = renderCounts()
+          // Hide every renderable outside the environment. Lights stay as they are: changing the
+          // light set would force every material to recompile (very slow on software GL).
+          for (let node: THREE.Object3D = root; node.parent; node = node.parent) {
+            for (const sib of node.parent.children) {
+              if (sib === node) continue
+              sib.traverse((o) => {
+                const r = o as THREE.Mesh & { isPoints?: boolean; isLine?: boolean; isSprite?: boolean }
+                if (o.visible && (r.isMesh || r.isPoints || r.isLine || r.isSprite)) {
+                  o.visible = false
+                  hidden.push(o)
+                }
+              })
+            }
+          }
+          const environment = renderCounts()
+          return { environment, scene: all, budget: { calls: 200, triangles: 300_000 } }
+        } finally {
+          for (const h of hidden) h.visible = true
+          gl.info.autoReset = autoReset
+          gl.info.reset()
+        }
+      },
       breakdown: () => {
         const rows: { name: string; material: string; triangles: number; instances: number; castShadow: boolean; visible: boolean }[] = []
         scene.getObjectByName('environment-root')?.traverse((o) => {
@@ -90,6 +129,7 @@ export function EnvDebug({ world }: { world: BuiltWorld | null }) {
     })
     const offCam = registerDebug('envcam', {
       look: (px: number, py: number, pz: number, tx: number, ty: number, tz: number) => {
+        const camera = get().camera
         camera.position.set(px, py, pz)
         camera.lookAt(tx, ty, tz)
         camera.updateMatrixWorld()
@@ -105,6 +145,6 @@ export function EnvDebug({ world }: { world: BuiltWorld | null }) {
       offCam()
       setLightingOverride(null)
     }
-  }, [gl, camera, scene, world])
+  }, [gl, get, scene, world])
   return null
 }

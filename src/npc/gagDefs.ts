@@ -65,6 +65,12 @@ export interface GagDef {
   actors: GagActor[]
   /** Idle bystanders within this radius turn to watch. */
   audience: number
+  /**
+   * Ground the choreography sweeps through (circles [x, z, radius]): the gag only
+   * starts on its own while the visitor stands clear of all of them, so nobody
+   * tumbles, rolls or splashes straight through them.
+   */
+  keepClear?: [number, number, number][]
   /** Ground position of each actor when the timeline ends. */
   endPositions(): Record<string, Vec2>
   start(ctx: GagContext): void
@@ -111,6 +117,11 @@ export const GAG_NAP: GagDef = {
   anchor: v3(NAP_CONVEYOR.pos[0], 1, NAP_CONVEYOR.pos[1]),
   actors: [{ npc: 'driver', station: 'nap', returnTo: 'lean' }],
   audience: 9,
+  keepClear: [
+    [NAP_OFF[0], NAP_OFF[1], 1.0],
+    [NAP_PICK[0], NAP_PICK[1], 1.0],
+    [NAP_DROP[0], NAP_DROP[1], 1.0],
+  ],
   endPositions: () => ({ driver: napTrack.end }),
   start(ctx) {
     ctx.fx.sfx('machine-clank', v3(CRATE_REST.x, 0.8, CRATE_REST.z + 0.3), 0.6, 0.8)
@@ -225,6 +236,10 @@ export const GAG_SOOT: GagDef = {
   anchor: SOOT_SRC,
   actors: [{ npc: 'smelter', station: 'furnace', returnTo: 'furnace' }],
   audience: 9,
+  keepClear: [
+    [SOOT_HOME[0] + 0.85, SOOT_HOME[1], 1.0],
+    [SOOT_OUT[0], SOOT_OUT[1], 1.1],
+  ],
   endPositions: () => ({ smelter: sootTrack.end }),
   start(ctx) {
     ctx.fx.sfx('machine-clank', SOOT_SRC, 0.6, 0.7)
@@ -274,6 +289,10 @@ export const GAG_VAT: GagDef = {
   anchor: v3(VAT.pos[0], 1.2, VAT.pos[1]),
   actors: [{ npc: 'tank', station: 'outer', returnTo: 'outer' }],
   audience: 9,
+  keepClear: [
+    [VAT_LOOK[0], VAT_LOOK[1], 1.1],
+    [VAT_BACK[0], VAT_BACK[1], 1.0],
+  ],
   endPositions: () => ({ tank: vatTrack.end }),
   start() {},
   update(t, dt, ctx) {
@@ -378,6 +397,10 @@ export const GAG_KICK: GagDef = {
   anchor: v3(KICK_MACHINE.pos[0], 0.9, KICK_MACHINE.pos[1]),
   actors: [{ npc: 'circuit', station: 'test', returnTo: 'test', returnVia: [KICK_VIA] }],
   audience: 10,
+  keepClear: [
+    [KICK_VIA[0], KICK_VIA[1], 1.0],
+    [KICK_SPOT[0], KICK_SPOT[1], 1.1],
+  ],
   endPositions: () => ({ circuit: kickTrack.end }),
   start() {},
   update(t, dt, ctx) {
@@ -463,6 +486,8 @@ export const GAG_STANDOFF: GagDef = {
     { npc: 'circuit', station: 'booth', returnTo: 'booth' },
   ],
   audience: 10,
+  // both jacks roll nose to nose across the aisle
+  keepClear: [[0, JACK_A.pos[1], 3.2]],
   endPositions: () => ({ smelter: standA.end, circuit: standB.end }),
   start() {},
   update(t, dt, ctx) {
@@ -500,7 +525,7 @@ export const GAG_STANDOFF: GagDef = {
 
 const ARM_CHIEF: Vec2 = [-10.9, -9.2]
 const ARM_LAND: Vec2 = [FOAM_PILE.pos[0], FOAM_PILE.pos[1]]
-const ARM_OUT: Vec2 = [-10.75, -13.35]
+const ARM_OUT: Vec2 = [-10.55, -13.35]
 const ARM_HOLD_OFFSET = 0.22
 const ARM_SINK = -0.32
 const TURRET_CHIEF = yawToward({ x: ROBOT_ARM.pos[0], z: ROBOT_ARM.pos[1] }, { x: ARM_CHIEF[0], z: ARM_CHIEF[1] })
@@ -542,6 +567,11 @@ export const GAG_ROBOT_ARM: GagDef = {
   anchor: v3(ROBOT_ARM.pos[0], 1.6, ROBOT_ARM.pos[1] - 1.5),
   actors: [{ npc: 'chief', station: 'arm', returnTo: 'arm' }],
   audience: 12,
+  keepClear: [
+    [ARM_CHIEF[0], ARM_CHIEF[1], 1.0],
+    [(ARM_CHIEF[0] + ARM_LAND[0]) / 2, (ARM_CHIEF[1] + ARM_LAND[1]) / 2, 1.6],
+    [ARM_OUT[0], ARM_OUT[1], 1.0],
+  ],
   endPositions: () => ({ chief: ARM_OUT }),
   start(ctx) {
     Object.assign(_a0, ctx.props.armNow)

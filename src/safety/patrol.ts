@@ -9,10 +9,11 @@
  */
 import type { Vec2 } from '@/core/types'
 import { clamp, dampAngle, wrapAngle, yawFromDirection, yawToward } from '@/core/math'
-import { WAYPOINTS } from '@/world/layout'
+import { RESTRICTED_ZONES, WAYPOINTS } from '@/world/layout'
 import { nearestWaypoint, shortestPath } from '@/world/nav'
 import type { WorkerAnim } from '@/world/WorkerModel'
 import { HEAD_SHAKE, PATROL, PATROL_ROUTE, type RoutePoint } from './config'
+import { zoneSignedDistance } from './zones'
 
 export type BurstKind = 'tweet' | 'whump'
 
@@ -68,6 +69,20 @@ interface Investigation {
 export type BrainMode = 'paused' | 'hold' | 'investigate' | 'stop' | 'path' | 'route' | 'yield'
 
 const SIDE_EYE_RADIUS = 6
+/** Keep off-graph walking legs at least this far outside every restricted zone (m). */
+const ZONE_CLEARANCE = 0.6
+
+/** True when the straight leg a→b keeps clear of every restricted zone (sampled every 0.4 m). */
+export function legClearOfZones(a: Vec2, b: Vec2): boolean {
+  const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.4))
+  for (let i = 0; i <= n; i++) {
+    const u = i / n
+    const x = a[0] + (b[0] - a[0]) * u
+    const z = a[1] + (b[1] - a[1]) * u
+    for (const zone of RESTRICTED_ZONES) if (zoneSignedDistance(zone, x, z) < ZONE_CLEARANCE) return false
+  }
+  return true
+}
 
 export class InspectorBrain {
   readonly actor: InspectorActor
@@ -195,7 +210,11 @@ export class InspectorBrain {
     const ax = x - last[0]
     const az = z - last[1]
     const len = Math.hypot(ax, az)
-    if (len > PATROL.approach) pts.push([x - (ax / len) * PATROL.approach, z - (az / len) * PATROL.approach])
+    if (len > PATROL.approach) {
+      // The last leg leaves the waypoint graph: never across (or into) a restricted zone.
+      const end: Vec2 = [x - (ax / len) * PATROL.approach, z - (az / len) * PATROL.approach]
+      if (legClearOfZones(last, end)) pts.push(end)
+    }
     this.path = dedupe(pts, [a.x, a.z])
     this.pathIndex = 0
     this.stopT = -1

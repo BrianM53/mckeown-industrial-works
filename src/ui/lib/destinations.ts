@@ -1,3 +1,4 @@
+import { contactOptions } from '@/content/links'
 import { yawToward } from '@/core/math'
 import type { PanelId } from '@/state/ui'
 import { ANCHORS, PRINCIPAL_ZONES, WAYPOINTS, ZONES, type ZoneId } from '@/world/layout'
@@ -54,6 +55,14 @@ function fromZone(id: ZoneId, overrides: Partial<Destination> = {}): Destination
   }
 }
 
+const CONTACT_KIND_NAME = { email: 'Email', linkedin: 'LinkedIn', github: 'GitHub', website: 'website' } as const
+
+/** "LinkedIn, GitHub and website" from the verified contact options (never a hard-coded claim). */
+export function contactChannels(): string {
+  const names = contactOptions().map((o) => CONTACT_KIND_NAME[o.kind])
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : (names[0] ?? 'GitHub')
+}
+
 /** Contact: opens the contact panel; in the world it is the pneumatic-tube mailbox at Visitor Intake. */
 function contactDestination(): Destination {
   const stand = WAYPOINTS.mailbox?.position ?? ANCHORS.contactMailbox.interact
@@ -64,7 +73,7 @@ function contactDestination(): Destination {
     name: 'Contact',
     shortName: 'Hire · Say hello',
     color: ZONES.intake.color,
-    blurb: 'LinkedIn, GitHub and website links. In the factory: the pneumatic-tube mailbox at Visitor Intake.',
+    blurb: `${contactChannels()} links. In the factory: the pneumatic-tube mailbox at Visitor Intake.`,
     panel: 'contact',
     principal: false,
     travel: { x: stand[0], z: stand[1], yaw: yawToward({ x: stand[0], z: stand[1] }, { x: box[0], z: box[1] }) },

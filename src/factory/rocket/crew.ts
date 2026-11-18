@@ -18,7 +18,7 @@
  *               transporter to their tower stations.
  */
 import * as THREE from 'three'
-import { clamp, lerp, smoothstep, yawToward } from '@/core/math'
+import { clamp, lerp, smoothstep, yawFromDirection } from '@/core/math'
 import type { LaunchOutcome, Vec2 } from '@/core/types'
 import type { WorkerAnim, WorkerLook } from '@/world/WorkerModel'
 import { PALETTE } from '@/world/palette'
@@ -148,6 +148,11 @@ const S_EXIT = 7.0
 /** Arc length where the crew join the track on the way back (just south of the barrier gap). */
 const S_ENTER = TRACK_PATH.length - 10.3
 
+/** yawToward without allocating {x,z} objects (hot path). */
+function yawTo(ax: number, az: number, bx: number, bz: number): number {
+  return yawFromDirection(bx - ax, bz - az)
+}
+
 const _tp: TrackPoint = { x: 0, z: 0, yaw: 0, tx: 1, tz: 0 }
 const _v = new THREE.Vector3()
 const _rear = new THREE.Vector3()
@@ -190,7 +195,7 @@ function walkPolyline(pts: Vec2[], d: number, out: { x: number; z: number; yaw: 
       const t = len > 1e-6 ? clamp(rem / len, 0, 1) : 1
       out.x = lerp(a[0], b[0], t)
       out.z = lerp(a[1], b[1], t)
-      out.yaw = yawToward({ x: a[0], z: a[1] }, { x: b[0], z: b[1] })
+      out.yaw = yawTo(a[0], a[1], b[0], b[1])
       return rem <= len
     }
     rem -= len
@@ -210,7 +215,7 @@ function setStation(def: CrewDef, i: number, ctx: CrewContext, out: CrewPose): v
   out.x = def.station[0]
   out.z = def.station[1]
   out.y = 0
-  out.yaw = yawToward({ x: def.station[0], z: def.station[1] }, { x: def.stationFacing[0], z: def.stationFacing[1] })
+  out.yaw = yawTo(def.station[0], def.station[1], def.stationFacing[0], def.stationFacing[1])
   out.speed = 0
   out.look = null
   if (i === 0) out.anim = 'work'
@@ -220,7 +225,7 @@ function setStation(def: CrewDef, i: number, ctx: CrewContext, out: CrewPose): v
   } else {
     out.anim = ctx.craneLowering ? 'point' : 'idle'
     out.look = _look[i].copy(ctx.hook)
-    if (ctx.craneLowering) out.yaw = yawToward({ x: out.x, z: out.z }, { x: ctx.hook.x, z: ctx.hook.z })
+    if (ctx.craneLowering) out.yaw = yawTo(out.x, out.z, ctx.hook.x, ctx.hook.z)
   }
 }
 
@@ -251,7 +256,7 @@ function runToSafety(def: CrewDef, x0: number, z0: number, t0: number, T: number
 }
 
 function watch(out: CrewPose, i: number, target: THREE.Vector3): void {
-  out.yaw = yawToward({ x: out.x, z: out.z }, { x: target.x, z: target.z })
+  out.yaw = yawTo(out.x, out.z, target.x, target.z)
   out.look = _look[i].copy(target)
 }
 
@@ -274,7 +279,7 @@ function returnWalk(def: CrewDef, startX: number, startZ: number, ctx: CrewConte
     const k = len1 > 1e-6 ? d / len1 : 1
     out.x = lerp(startX, enterX, k)
     out.z = lerp(startZ, enterZ, k)
-    if (t > 0) out.yaw = yawToward({ x: startX, z: startZ }, { x: enterX, z: enterZ })
+    if (t > 0) out.yaw = yawTo(startX, startZ, enterX, enterZ)
     return true
   }
   if (d < len1 + len2) {
@@ -294,12 +299,17 @@ function returnWalk(def: CrewDef, startX: number, startZ: number, ctx: CrewConte
   return walking && d - len1 - len2 < len3
 }
 
-function rocketPoint(ctx: CrewContext, local: [number, number, number], out: THREE.Vector3): THREE.Vector3 {
-  return out.set(local[0], local[1], local[2]).applyMatrix4(ctx.rocketMatrix)
-}
-
-function transporterPoint(ctx: CrewContext, local: [number, number, number], out: THREE.Vector3): THREE.Vector3 {
-  return out.set(local[0], local[1], local[2]).applyMatrix4(ctx.transporterMatrix)
+/** Pose on the rocket's ladder (rocket frame x, y, z), riding the rocket's tilt. */
+function climbing(ctx: CrewContext, out: CrewPose, y: number, z: number, facing: number, anim: WorkerAnim, speed: number, x = 0): void {
+  _v.set(x, y, z).applyMatrix4(ctx.rocketMatrix)
+  out.x = _v.x
+  out.y = _v.y
+  out.z = _v.z
+  out.quat = _q.copy(ctx.rocketQuat).multiply(_qFacing.setFromAxisAngle(Y_AXIS, facing))
+  out.yaw = 0
+  out.anim = anim
+  out.speed = speed
+  out.snap = true
 }
 
 /**
@@ -327,7 +337,7 @@ export function crewPose(i: number, ctx: CrewContext, out: CrewPose): CrewPose {
       const sz = out.z
       out.x = lerp(def.station[0], sx, k)
       out.z = lerp(def.station[1], sz, k)
-      out.yaw = yawToward({ x: def.station[0], z: def.station[1] }, { x: sx, z: sz })
+      out.yaw = yawTo(def.station[0], def.station[1], sx, sz)
       out.anim = 'walk'
       out.speed = WALK
       return out
@@ -356,28 +366,17 @@ export function crewPose(i: number, ctx: CrewContext, out: CrewPose): CrewPose {
 
     if (isC) {
       // the inspector: walk to the rear of the deck, hop up, climb the ladder
-      const rear = transporterPoint(ctx, [0, 0, TRANSPORTER.length / 2 + 0.45], _rear)
-      const deck = transporterPoint(ctx, [0, DECK_Y, ctx.anchor[2]], _deck)
+      const rear = _rear.set(0, 0, TRANSPORTER.length / 2 + 0.45).applyMatrix4(ctx.transporterMatrix)
+      const deck = _deck.set(0, DECK_Y, ctx.anchor[2]).applyMatrix4(ctx.transporterMatrix)
       const climbTop = ctx.anchor
       const tp = T - T_PAD
       if (tp < 1.6) {
         out.x = lerp(sideX, rear.x, smoothstep(0, 1.6, tp))
         out.z = lerp(sideZ, rear.z, smoothstep(0, 1.6, tp))
-        out.yaw = yawToward({ x: sideX, z: sideZ }, { x: rear.x, z: rear.z })
+        out.yaw = yawTo(sideX, sideZ, rear.x, rear.z)
         out.anim = 'walk'
         out.speed = WALK
         return out
-      }
-      const climbing = (local: [number, number, number], facing: number, anim: WorkerAnim, speed: number) => {
-        rocketPoint(ctx, local, _v)
-        out.x = _v.x
-        out.y = _v.y
-        out.z = _v.z
-        out.quat = _q.copy(ctx.rocketQuat).multiply(_qFacing.setFromAxisAngle(Y_AXIS, facing))
-        out.yaw = 0
-        out.anim = anim
-        out.speed = speed
-        out.snap = true
       }
       // when C is not the stowaway he climbs down at T = 0 and runs
       const downAt = 0
@@ -385,7 +384,7 @@ export function crewPose(i: number, ctx: CrewContext, out: CrewPose): CrewPose {
         const td = T - downAt
         if (td < 1.4) {
           const k = smoothstep(0, 1.4, td)
-          climbing([0, lerp(climbTop[1], 0, k), climbTop[2]], 0, 'walk', 0.8)
+          climbing(ctx, out, lerp(climbTop[1], 0, k), climbTop[2], 0, 'walk', 0.8)
           return out
         }
         if (td < 1.85) {
@@ -393,7 +392,7 @@ export function crewPose(i: number, ctx: CrewContext, out: CrewPose): CrewPose {
           out.x = lerp(deck.x, rear.x, k)
           out.z = lerp(deck.z, rear.z, k)
           out.y = DECK_Y * (1 - k) + Math.sin(k * Math.PI) * 0.5
-          out.yaw = yawToward({ x: deck.x, z: deck.z }, { x: rear.x, z: rear.z })
+          out.yaw = yawTo(deck.x, deck.z, rear.x, rear.z)
           out.anim = 'tumble'
           out.snap = true
           return out
@@ -408,7 +407,7 @@ export function crewPose(i: number, ctx: CrewContext, out: CrewPose): CrewPose {
         out.x = lerp(rear.x, deck.x, k)
         out.z = lerp(rear.z, deck.z, k)
         out.y = DECK_Y * k + Math.sin(k * Math.PI) * 0.5
-        out.yaw = yawToward({ x: rear.x, z: rear.z }, { x: deck.x, z: deck.z })
+        out.yaw = yawTo(rear.x, rear.z, deck.x, deck.z)
         out.anim = 'walk'
         out.speed = WALK
         out.snap = true
@@ -416,7 +415,7 @@ export function crewPose(i: number, ctx: CrewContext, out: CrewPose): CrewPose {
       }
       if (tp < 4.2) {
         const k = smoothstep(2.1, 4.2, tp)
-        climbing([0, lerp(0, climbTop[1], k), climbTop[2]], 0, 'walk', 0.8)
+        climbing(ctx, out, lerp(0, climbTop[1], k), climbTop[2], 0, 'walk', 0.8)
         return out
       }
       // on the ladder (stowaway or still inspecting before T = 0)
@@ -426,11 +425,11 @@ export function crewPose(i: number, ctx: CrewContext, out: CrewPose): CrewPose {
         return out
       }
       if (T < 4 || !stowaway) {
-        climbing(climbTop, 0, 'work', 0)
+        climbing(ctx, out, climbTop[1], climbTop[2], 0, 'work', 0, climbTop[0])
       } else if (T < T_IGNITION) {
-        climbing(climbTop, Math.PI, 'wave', 0)
+        climbing(ctx, out, climbTop[1], climbTop[2], Math.PI, 'wave', 0, climbTop[0])
       } else {
-        climbing(climbTop, Math.PI, 'panic', 0)
+        climbing(ctx, out, climbTop[1], climbTop[2], Math.PI, 'panic', 0, climbTop[0])
       }
       return out
     }
@@ -555,7 +554,7 @@ function stowawayFlight(ctx: CrewContext, tau: number, out: CrewPose): void {
     out.x = lerp(st.rest[0], ground[0], k)
     out.z = lerp(st.rest[2], ground[1], k)
     out.y = lerp(st.rest[1], 0, k) + Math.sin(k * Math.PI) * 0.55
-    out.yaw = yawToward({ x: st.rest[0], z: st.rest[2] }, { x: ground[0], z: ground[1] })
+    out.yaw = yawTo(st.rest[0], st.rest[2], ground[0], ground[1])
     out.anim = 'idle'
     return
   }
@@ -563,7 +562,7 @@ function stowawayFlight(ctx: CrewContext, tau: number, out: CrewPose): void {
   out.z = ground[1]
   out.y = 0
   out.snap = false
-  out.yaw = yawToward({ x: ground[0], z: ground[1] }, { x: PAD_X, z: PAD_Z + 9 })
+  out.yaw = yawTo(ground[0], ground[1], PAD_X, PAD_Z + 9)
   if (t < dustEnd) out.anim = 'work'
   else if (t < waveEnd) out.anim = 'wave'
   else {

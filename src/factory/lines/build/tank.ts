@@ -211,7 +211,7 @@ export function buildTank(k: Kit): Animator {
         const n = steam.take((f.reduced ? 18 : 40) * fx.emit, f.dt)
         for (let i = 0; i < n; i++)
           fx.puffs.emit(flange[0] - 0.08, flange[1] + 0.25, flange[2], -1.6 - jit.next() * 1.6, 1.4 + jit.next() * 1.2, jit.sym() * 0.5, 0.9 + jit.next() * 0.5, 0.15, 1.1, 0.75, 0.93, 0.95, 0.97, 0.6)
-        if (t - lastHiss > 4) {
+        if (t - lastHiss > 4 || t < lastHiss) {
           lastHiss = t
           fx.sfx('steam-hiss', [flange[0], flange[1], flange[2]], 0.8)
         }
