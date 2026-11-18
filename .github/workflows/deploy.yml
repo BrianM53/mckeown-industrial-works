@@ -5,9 +5,12 @@
 # The site needs no secrets. For a custom domain, change SITE_URL (and PAGES_BASE_PATH to "/") below.
 name: Deploy to GitHub Pages
 
+# NOTE (2026-11-18): GitHub Actions jobs currently refuse to start on this account ("account is locked due to
+# a billing issue"), so the live site is deployed with `npm run deploy:pages` (gh-pages branch) instead.
+# Once Actions works again, switch Settings → Pages → Source back to "GitHub Actions" and restore:
+#   push:
+#     branches: [main]
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

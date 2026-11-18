@@ -3,9 +3,11 @@
 # LinkedIn's bot block (HTTP 999) and unverified links are reported, not failed.
 name: Link check
 
+# The weekly schedule is paused while GitHub Actions is unavailable on this account (billing lock).
+# Restore it with:
+#   schedule:
+#     - cron: '17 9 * * 1' # Mondays 09:17 UTC
 on:
-  schedule:
-    - cron: '17 9 * * 1' # Mondays 09:17 UTC
   workflow_dispatch:
 
 permissions:

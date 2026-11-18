@@ -19,6 +19,11 @@ export const runtime = {
     grounded: true,
     /** Current control mode. writer: player (forklift module asks via services) */
     mode: 'foot' as PlayerMode,
+    /**
+     * Incremented on every discontinuous move (teleport, respawn, fast travel, recover).
+     * Readers compare it frame-to-frame to tell a jump from walking. writer: player
+     */
+    teleportSeq: 0,
   },
   camera: {
     /** Orbit yaw/pitch (radians) and boom length (m). writer: player (camera rig) */

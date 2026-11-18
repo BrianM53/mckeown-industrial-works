@@ -2,7 +2,7 @@
   "name": "mckeown-industrial-works",
   "private": true,
   "version": "1.0.0",
-  "description": "McKeown Industrial Works — an explorable third-person 3D factory portfolio for Brian McKeown.",
+  "description": "McKeown Industrial Works \u2014 an explorable third-person 3D factory portfolio for Brian McKeown.",
   "type": "module",
   "engines": {
     "node": ">=20.19"
@@ -20,7 +20,9 @@
     "test:all": "npm run typecheck && npm run test && npm run build:test && npm run test:e2e",
     "shot": "node scripts/shot.mjs",
     "check:links": "tsx scripts/check-links.ts",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "deploy:pages": "bash scripts/deploy-pages.sh",
+    "check:live": "node scripts/livecheck.mjs"
   },
   "dependencies": {
     "@fontsource/barlow": "^5.3.0",
