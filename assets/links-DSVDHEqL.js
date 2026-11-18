@@ -1,0 +1,1 @@
+import{P as i}from"./index-D3xFLiR7.js";function t(){const e=[];return e.push({kind:"linkedin",label:"Message on LinkedIn",href:i.linkedin.url}),e.push({kind:"github",label:"GitHub — BrianM53",href:i.github.url}),e.push({kind:"website",label:i.website.label,href:i.website.url}),e}export{t as c};

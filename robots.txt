@@ -1,0 +1,5 @@
+# McKeown Industrial Works
+User-agent: *
+Allow: /
+
+Sitemap: https://brianm53.github.io/mckeown-industrial-works/sitemap.xml
