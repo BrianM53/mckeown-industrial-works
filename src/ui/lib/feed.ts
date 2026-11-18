@@ -8,6 +8,13 @@ import { create } from 'zustand'
 export type ToastKind = 'info' | 'success' | 'warning'
 export type CaptionKind = 'sound' | 'pa' | 'info' | 'warning'
 
+/** A link rendered as a small button under the toast text (same-tab navigation). */
+export interface ToastAction {
+  label: string
+  href: string
+  primary?: boolean
+}
+
 export interface ToastItem {
   id: number
   text: string
@@ -15,6 +22,7 @@ export interface ToastItem {
   /** Optional small heading, e.g. "Achievement unlocked". */
   title?: string
   variant?: 'achievement'
+  actions?: ToastAction[]
 }
 
 export interface CaptionItem {
@@ -69,22 +77,35 @@ function unschedule(key: string): void {
   timers.delete(key)
 }
 
-export function pushToast(input: { text: string; kind?: ToastKind; duration?: number; title?: string; variant?: 'achievement' }): number {
+export interface ToastInput {
+  text: string
+  kind?: ToastKind
+  /** Seconds on screen (default: reading time). Ignored when `sticky`. */
+  duration?: number
+  title?: string
+  variant?: 'achievement'
+  actions?: ToastAction[]
+  /** Stay until dismissed (offers with actions: a timed-out choice is no choice for slow readers). */
+  sticky?: boolean
+}
+
+export function pushToast(input: ToastInput): number {
   const text = String(input.text ?? '').trim()
   if (!text) return -1
   const seconds = normalizeDuration(input.duration, readingTime(text, 3.2, 9))
   const current = useFeed.getState().toasts
   const existing = current.find((t) => t.text === text && t.title === input.title)
   if (existing) {
-    schedule(`t${existing.id}`, seconds, () => removeToast(existing.id))
+    if (!input.sticky) schedule(`t${existing.id}`, seconds, () => removeToast(existing.id))
     return existing.id
   }
   const id = ++seq
-  const item: ToastItem = { id, text, kind: input.kind ?? 'info', title: input.title, variant: input.variant }
+  const actions = input.actions?.filter((a) => a && a.label && a.href)
+  const item: ToastItem = { id, text, kind: input.kind ?? 'info', title: input.title, variant: input.variant, actions: actions?.length ? actions : undefined }
   const next = [...current, item]
   for (const dropped of next.slice(0, Math.max(0, next.length - MAX_TOASTS))) unschedule(`t${dropped.id}`)
   useFeed.setState({ toasts: next.slice(-MAX_TOASTS) })
-  schedule(`t${id}`, seconds, () => removeToast(id))
+  if (!input.sticky) schedule(`t${id}`, seconds, () => removeToast(id))
   return id
 }
 

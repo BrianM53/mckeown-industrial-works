@@ -22,6 +22,11 @@ import { SafePositionTracker, StuckDetector, type SafePos } from './recovery'
 const OVERLAP_GROUPS = interactionGroups(CG.PLAYER, [CG.STATIC, CG.VEHICLE])
 /** Query groups: walkable static ground. */
 const GROUND_GROUPS = interactionGroups(CG.PLAYER, [CG.STATIC])
+/**
+ * Feet height of the parked capsule while the worker sits in a vehicle: far
+ * below the ground slab, so even a stale contact can never touch anything.
+ */
+export const PARK_Y = -60
 
 export interface ControllerEvents {
   footstep(x: number, y: number, z: number, run: boolean, surface: 'concrete' | 'metal'): void
@@ -69,6 +74,13 @@ export class PlayerController {
   private clockedIn = false
   /** True when a teleport happened while driving (vehicles module placed us). */
   teleportedWhileDriving = false
+  /**
+   * Seated in a vehicle: the capsule is disabled, in no collision group and
+   * parked at PARK_Y (Rapier can keep contacts alive for a disabled collider
+   * after its body moves). `pos` then holds the logical spot — where the worker
+   * entered, or where a teleport while driving asked us to stand on exit.
+   */
+  parked = false
   /** Physics reported a non-finite position (frame loop respawns us). */
   corrupt = false
 
@@ -140,15 +152,10 @@ export class PlayerController {
     if (!body || !col || !kcc || !this.world || !this.rapier) return
     this.time += dt
     this.steps++
-    const t = body.translation()
-    if (!Number.isFinite(t.x) || !Number.isFinite(t.y) || !Number.isFinite(t.z)) {
-      this.corrupt = true
-      return
-    }
-    this.pos.set(t.x, t.y, t.z)
-
-    if (this.mode === 'forklift') {
-      // Parked and non-colliding while driving; the frame loop mirrors the seat.
+    if (this.parked || this.mode === 'forklift') {
+      // Seated: the capsule stays parked and non-colliding; the frame loop mirrors the seat.
+      // `pos` keeps the logical spot (never the parked body's translation).
+      if (this.parked) this.keepParked(body, col)
       this.vel.x = this.vel.z = 0
       this.vy = 0
       this.inputActive = false
@@ -156,6 +163,12 @@ export class PlayerController {
       this.measured.set(0, 0, 0)
       return
     }
+    const t = body.translation()
+    if (!Number.isFinite(t.x) || !Number.isFinite(t.y) || !Number.isFinite(t.z)) {
+      this.corrupt = true
+      return
+    }
+    this.pos.set(t.x, t.y, t.z)
 
     // ---- input
     const steer = this.controllable
@@ -358,7 +371,8 @@ export class PlayerController {
     const gy = y !== undefined && Number.isFinite(y) ? y : this.groundHeightAt(cx, cz)
     const p = { x: cx, y: gy + PLAYER.skin + 0.02, z: cz }
     const body = this.body
-    if (body) {
+    // Seated: only the logical spot moves (we stand there on exit); the capsule stays parked.
+    if (body && !this.parked) {
       try {
         body.setTranslation(p, true)
         body.setNextKinematicTranslation(p)
@@ -380,7 +394,47 @@ export class PlayerController {
     // History from before a teleport describes another place: start fresh.
     this.safe.clear()
     this.snapVisual = 3
-    if (this.mode === 'forklift') this.teleportedWhileDriving = true
+    if (this.mode === 'forklift' || this.parked) this.teleportedWhileDriving = true
+  }
+
+  /**
+   * Sit down in a vehicle: disable the capsule, drop it from every collision
+   * group and park it far below the world. Idempotent.
+   */
+  park(): void {
+    this.parked = true
+    this.vel.x = this.vel.z = 0
+    this.vy = 0
+    this.knock = null
+    this.measured.set(0, 0, 0)
+    const body = this.body
+    const col = this.collider
+    if (body && col) this.keepParked(body, col)
+  }
+
+  /** Stand up at feet (x, z): place the capsule there, then make it collide again. */
+  unpark(x: number, z: number, yaw: number): void {
+    this.parked = false
+    this.teleportNow(x, z, yaw)
+    this.setColliderEnabled(true)
+  }
+
+  /** Re-assert the parked state (cheap; runs every step while seated — survives body re-creation). */
+  private keepParked(body: RigidBody, col: Collider): void {
+    try {
+      if (col.isEnabled()) col.setEnabled(false)
+      if (col.collisionGroups() !== 0) col.setCollisionGroups(0)
+      const t = body.translation()
+      if (!(t.y < PARK_Y + 1) || !Number.isFinite(t.x + t.z)) {
+        const x = Number.isFinite(this.pos.x) ? this.pos.x : 0
+        const z = Number.isFinite(this.pos.z) ? this.pos.z : 0
+        const p = { x, y: PARK_Y, z }
+        body.setTranslation(p, false)
+        body.setNextKinematicTranslation(p)
+      }
+    } catch {
+      /* body / collider being removed */
+    }
   }
 
   /** Begin a cartoon knock-back away from `from` (tackle). */
@@ -407,9 +461,13 @@ export class PlayerController {
     this.vel.x = this.vel.z = 0
   }
 
+  /** Collider on (PLAYER groups) / off (disabled and in no group at all). */
   setColliderEnabled(on: boolean): void {
     try {
-      this.collider?.setEnabled(on)
+      const c = this.collider
+      if (!c) return
+      c.setCollisionGroups(on ? GROUPS.player : 0)
+      c.setEnabled(on)
     } catch {
       /* ignore */
     }

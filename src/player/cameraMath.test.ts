@@ -6,9 +6,12 @@ import {
   clampDistance,
   clampPitch,
   decayTrauma,
+  fovForAspect,
+  horizontalFov,
   nearFade,
   nearestAngle,
   orbitOffset,
+  portraitLookLift,
   springArmStep,
   wheelToZoom,
   type ArmState,
@@ -123,5 +126,32 @@ describe('interior & comfort helpers', () => {
     const mid = nearFade(0.9)
     expect(mid).toBeGreaterThan(0)
     expect(mid).toBeLessThan(1)
+  })
+})
+
+describe('portrait framing', () => {
+  it('landscape keeps the base FOV', () => {
+    expect(fovForAspect(16 / 9)).toBe(CAMERA.fov)
+    expect(fovForAspect(1.2)).toBe(CAMERA.fov)
+    expect(fovForAspect(Number.NaN)).toBe(CAMERA.fov)
+    expect(fovForAspect(0)).toBe(CAMERA.fov)
+  })
+  it('portrait phones widen the vertical FOV (capped) so the view across is no longer ~28°', () => {
+    const pixel7 = 412 / 839
+    expect(horizontalFov(CAMERA.fov, pixel7)).toBeLessThan(30) // the reported problem
+    const fov = fovForAspect(pixel7)
+    expect(fov).toBeGreaterThan(CAMERA.fov)
+    expect(fov).toBeLessThanOrEqual(CAMERA.maxPortraitFov)
+    expect(horizontalFov(fov, pixel7)).toBeGreaterThan(40)
+    // a portrait tablet reaches the full minimum horizontal FOV without hitting the cap
+    const tablet = 0.75
+    expect(horizontalFov(fovForAspect(tablet), tablet)).toBeCloseTo(CAMERA.minHorizontalFov, 3)
+    expect(fovForAspect(tablet)).toBeLessThan(CAMERA.maxPortraitFov)
+  })
+  it('portrait aims a little higher (worker lower in the frame); never on landscape', () => {
+    expect(portraitLookLift(16 / 9)).toBe(0)
+    expect(portraitLookLift(1)).toBe(0)
+    expect(portraitLookLift(0.75)).toBeCloseTo(CAMERA.portraitLookLift / 2)
+    expect(portraitLookLift(0.45)).toBe(CAMERA.portraitLookLift)
   })
 })

@@ -14,6 +14,7 @@ import type { BuiltWorld } from './world'
  *   __MIW__.environment.measure()                -> renders one frame with ONLY the environment visible and
  *                                                   returns its draw calls / triangles (incl. shadow pass)
  *                                                   next to the whole scene's, for the perf budget
+ *   __MIW__.environment.split(names?)            -> per-module calls/triangles (+ shadow share, casters) at this view
  *   __MIW__.environment.breakdown()              -> triangles per environment mesh (largest first)
  *   __MIW__.environment.setLighting(level, em)   -> force the environment's lighting response (visual-only
  *                                                   override; runtime.lighting stays owned by safety).
@@ -22,6 +23,8 @@ import type { BuiltWorld } from './world'
  *   __MIW__.environment.setPlayer(x, z, yaw?)    -> teleport the player (or move the focus when no player module)
  *   __MIW__.envcam.look(px,py,pz, tx,ty,tz)      -> place the default camera (overridden by the player rig)
  */
+const SPLIT_ROOTS = ['environment-root', 'production-spine', 'factory-rocket', 'npc-root', 'stations-a', 'stations-b', 'vehicles-root', 'safety', 'player']
+
 export function EnvDebug({ world }: { world: BuiltWorld | null }) {
   const gl = useThree((s) => s.gl)
   const get = useThree((s) => s.get)
@@ -95,6 +98,81 @@ export function EnvDebug({ world }: { world: BuiltWorld | null }) {
           gl.info.autoReset = autoReset
           gl.info.reset()
         }
+      },
+      /**
+       * Per-module cost at the current view: for each named root, renders it alone (lights untouched)
+       * with and without the shadow pass. Shadow pass is skipped via shadowMap.autoUpdate (no recompile).
+       */
+      split: (names: string[] = SPLIT_ROOTS) => {
+        const camera = get().camera
+        const sm = gl.shadowMap
+        const autoReset = gl.info.autoReset
+        const smAuto = sm.autoUpdate
+        gl.info.autoReset = false
+        const renderables: THREE.Object3D[] = []
+        scene.traverse((o) => {
+          const r = o as THREE.Mesh & { isPoints?: boolean; isLine?: boolean; isSprite?: boolean }
+          if (o.visible && (r.isMesh || r.isPoints || r.isLine || r.isSprite)) renderables.push(o)
+        })
+        const count = (withShadow: boolean) => {
+          sm.autoUpdate = withShadow
+          sm.needsUpdate = withShadow
+          gl.info.reset()
+          gl.render(scene, camera)
+          return { calls: gl.info.render.calls, triangles: gl.info.render.triangles }
+        }
+        const isVisibleChain = (o: THREE.Object3D) => {
+          for (let n: THREE.Object3D | null = o; n; n = n.parent) if (!n.visible) return false
+          return true
+        }
+        const out: Record<string, unknown> = {}
+        try {
+          const all = count(true)
+          const allNo = count(false)
+          out.scene = { ...all, shadowCalls: all.calls - allNo.calls, shadowTriangles: all.triangles - allNo.triangles }
+          let sumT = 0
+          for (const name of names) {
+            const root = scene.getObjectByName(name)
+            if (!root) continue
+            const keep = new Set<THREE.Object3D>()
+            root.traverse((o) => keep.add(o))
+            const hidden: THREE.Object3D[] = []
+            for (const o of renderables) if (!keep.has(o)) { o.visible = false; hidden.push(o) }
+            let casters = 0
+            root.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.castShadow && isVisibleChain(o)) casters++ })
+            const a = count(true)
+            const b = count(false)
+            for (const h of hidden) h.visible = true
+            sumT += a.triangles
+            out[name] = { calls: a.calls, triangles: a.triangles, shadowCalls: a.calls - b.calls, shadowTriangles: a.triangles - b.triangles, casters }
+          }
+          out.unattributedTriangles = all.triangles - sumT
+          return out
+        } finally {
+          for (const o of renderables) o.visible = true
+          sm.autoUpdate = smAuto
+          sm.needsUpdate = true
+          gl.info.autoReset = autoReset
+          gl.info.reset()
+        }
+      },
+      /** Shadow casters under a named root (largest first): name, triangles, instances, bounding radius. */
+      casters: (name = 'environment-root', n = 25) => {
+        const rows: [string, number, number, number][] = []
+        const sph = new THREE.Sphere()
+        scene.getObjectByName(name)?.traverse((o) => {
+          const m = o as THREE.Mesh
+          if (!m.isMesh || !m.castShadow) return
+          for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return
+          const g = m.geometry as THREE.BufferGeometry
+          const base = g.index ? g.index.count / 3 : (g.getAttribute('position')?.count ?? 0) / 3
+          const im = o as THREE.InstancedMesh
+          const inst = im.isInstancedMesh ? im.count : 1
+          if (!g.boundingSphere) g.computeBoundingSphere()
+          sph.copy(g.boundingSphere!).applyMatrix4(m.matrixWorld)
+          rows.push([m.name || m.parent?.name || '?', Math.round(base * inst), inst, Math.round(sph.radius * 10) / 10])
+        })
+        return rows.sort((a, b) => b[1] - a[1]).slice(0, n)
       },
       breakdown: () => {
         const rows: { name: string; material: string; triangles: number; instances: number; castShadow: boolean; visible: boolean }[] = []

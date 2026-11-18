@@ -96,6 +96,8 @@ export class PlayerSystem {
   leanGroup: THREE.Group | null = null
   /** Physics anchor inside the RigidBody (rapier-interpolated position). */
   anchor: THREE.Object3D | null = null
+  /** Scene seen by the last frame (debug stats only). */
+  private scene: THREE.Object3D | null = null
 
   private clock = 0
   private interactTimer = 0
@@ -128,6 +130,7 @@ export class PlayerSystem {
     this.prevFacing = spawn.yaw
     this.rig.snapBehind(spawn.yaw)
     this.writeRuntime(spawn.x, 0, spawn.z, spawn.yaw, 0)
+    runtime.player.teleportSeq++
   }
 
   // ------------------------------------------------------------------ physics hookup
@@ -159,11 +162,18 @@ export class PlayerSystem {
     this.cancelSequence()
     this.setMode('forklift')
     this.ctrl.teleportedWhileDriving = false
-    this.ctrl.setColliderEnabled(false)
+    // Disabled + no collision groups + parked below the world: the hidden capsule can never
+    // touch the forklift (or anything else) while we drive.
+    this.ctrl.park()
     this.ctrl.stuck.reset(this.ctrl.pos.x, this.ctrl.pos.z)
     this.rig.setFollow('forklift')
     this.updateStuckHint(true)
     this.interactTimer = 1
+    // The published position jumps to the seat now.
+    const f = runtime.forklift
+    if (Number.isFinite(f.position.x + f.position.y + f.position.z)) this.visual.copy(f.position)
+    if (Number.isFinite(f.yaw)) this.visualFacing = f.yaw
+    this.noteJump()
   }
 
   /** Leave forklift mode (idempotent): place the worker beside the vehicle. */
@@ -179,14 +189,41 @@ export class PlayerSystem {
       const cp = nearestCheckpoint(fp.x, fp.z)
       spot = { x: cp.position[0], z: cp.position[1] }
     }
-    c.teleportNow(spot.x, spot.z, fyaw)
-    c.setColliderEnabled(true)
+    // Measured from the seat (the published position), not from the hidden capsule.
+    const seat = runtime.player.position
+    const far = Math.hypot(spot.x - seat.x, spot.z - seat.z) > 10
+    c.unpark(spot.x, spot.z, fyaw)
     c.teleportedWhileDriving = false
     // A vehicle lock must never outlive the vehicle (softlock guard).
     for (const r of [...c.locks]) if (VEHICLE_LOCK.test(r)) c.locks.delete(r)
     this.setMode('foot')
     this.rig.setFollow('player')
+    if (far) this.rig.snapBehind(c.facing)
     this.interactTimer = 1
+    // The published position jumps from the seat to where the worker stands.
+    this.syncVisualToBody()
+    this.noteJump()
+  }
+
+  /** Visual state = the controller's (just placed) body, no smoothing. */
+  private syncVisualToBody(): void {
+    const c = this.ctrl
+    this.visual.set(c.pos.x, c.pos.y - PLAYER.skin, c.pos.z)
+    this.visY = c.pos.y
+    this.visualFacing = c.facing
+    this.prevFacing = c.facing
+    this.visualSpeed = 0
+  }
+
+  /**
+   * A discontinuous move of the published position (teleport, respawn, recover,
+   * fast travel, tackle respawn, forklift enter/exit): publish the new position
+   * right away and bump runtime.player.teleportSeq, so readers always see the
+   * new sequence number together with the new position.
+   */
+  private noteJump(): void {
+    this.writeRuntime(this.visual.x, this.visual.y, this.visual.z, this.visualFacing, 0)
+    runtime.player.teleportSeq++
   }
 
   // ------------------------------------------------------------------ sequences
@@ -207,18 +244,26 @@ export class PlayerSystem {
     return this.seqCancel !== null || this.tacklePromise !== null
   }
 
-  /** Instant move. Snaps the camera behind the new facing when asked (or when the jump is far). */
+  /**
+   * Instant move. Snaps the camera behind the new facing when asked (or when the jump is far).
+   * While driving only the logical exit spot moves: the worker stays seated, the published
+   * position stays the seat and the chase camera keeps following the forklift.
+   */
   moveNow(x: number, z: number, yaw: number, snapCamera: boolean): void {
-    const far = Math.hypot(x - this.ctrl.pos.x, z - this.ctrl.pos.z) > 10
+    if (this.ctrl.mode === 'forklift') {
+      this.ctrl.teleportNow(x, z, yaw)
+      this.input.clear()
+      this.interactTimer = 1
+      return
+    }
+    const far = Math.hypot(x - this.visual.x, z - this.visual.z) > 10
     this.ctrl.teleportNow(x, z, yaw)
-    this.visual.set(this.ctrl.pos.x, this.ctrl.pos.y, this.ctrl.pos.z)
-    this.visY = this.ctrl.pos.y
-    this.visualFacing = this.ctrl.facing
-    this.prevFacing = this.ctrl.facing
+    this.syncVisualToBody()
     if (snapCamera || far) this.rig.snapBehind(this.ctrl.facing)
     this.input.clear()
     this.target = null
     this.interactTimer = 1
+    this.noteJump()
   }
 
   /** PlayerService.teleport */
@@ -549,8 +594,9 @@ export class PlayerSystem {
     }
     this.workerOpacity = driving ? 1 : nearFade(this.rig.arm.length)
     if (scene) {
+      this.scene = scene
       _v.set(this.visual.x, this.visual.y + (driving ? 1.6 : 1.7), this.visual.z)
-      this.occluders.update(dt, scene, this.rig.position, _v)
+      this.occluders.update(dt, scene, this.rig.position, _v, { skipContaining: driving })
     }
 
     // ---- 5. interaction (15 Hz)
@@ -699,7 +745,32 @@ export class PlayerSystem {
           stuck: this.ctrl.stuck.stuck,
           target: this.target?.id ?? null,
           steps: this.ctrl.steps,
+          teleportSeq: runtime.player.teleportSeq,
+          parked: this.ctrl.parked,
         }
+      },
+      /** Shared WorkerModel stats for perf checks: visible workers, how many use the distant LOD, shadow casters. */
+      workers: () => {
+        const sc = this.scene
+        if (!sc) return null
+        let visible = 0
+        let lod = 0
+        let shadowCasters = 0
+        let triangles = 0
+        sc.traverseVisible((o) => {
+          const m = o as THREE.SkinnedMesh
+          if (!m.isSkinnedMesh || m.name !== 'worker') return
+          const g = m.geometry
+          const t = (g.index ? g.index.count : g.getAttribute('position').count) / 3
+          visible++
+          if (t < 1500) lod++
+          triangles += t
+          if (m.castShadow) {
+            shadowCasters++
+            triangles += t
+          }
+        })
+        return { visible, lod, shadowCasters, triangles }
       },
       teleport: (x: number, z: number, yaw?: number) => {
         if (this.tacklePromise) return false

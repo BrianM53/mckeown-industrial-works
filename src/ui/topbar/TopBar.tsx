@@ -106,10 +106,15 @@ export function TopBar({ mode }: { mode: UIMode }) {
 
   return (
     <header className="miw-topbar" data-testid="topbar" data-menu-open={menuOpen ? '' : undefined}>
-      {mode === 'game' && (
-        // First tab stop on the page: keyboard and screen-reader visitors can leave the 3D view at once.
+      {/* First tab stop on the page. Game mode: leave the 3D view at once. Fallback mode: jump past
+          the top bar to the portfolio content (FallbackPortfolio → PortfolioDocument #content). */}
+      {mode === 'game' ? (
         <a className="miw-skiplink" href={portfolioHref()} data-testid="skip-link">
           Skip the 3D factory: view the portfolio page
+        </a>
+      ) : (
+        <a className="miw-skiplink" href="#content" data-testid="skip-link">
+          Skip to content
         </a>
       )}
       <button

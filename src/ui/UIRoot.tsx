@@ -10,6 +10,7 @@ import { Toasts } from './hud/Toasts'
 import { useUIKeyboard } from './input/useUIKeyboard'
 import { Panel } from './kit/Panel'
 import { clearFeed, pushCaption, pushToast } from './lib/feed'
+import { offerLitePortfolio } from './lib/liteOffer'
 import { portfolioHref } from './lib/links'
 import { UIModeContext, type UIMode } from './lib/mode'
 import { installModalityTracking, useIsTouch, useModality } from './lib/modality'
@@ -197,6 +198,8 @@ function useUIEffects(mode: UIMode): void {
         setRouteTarget: (zoneId: string | null) => useUIStore.getState().setRouteTarget(zoneId),
         // Re-show (true) or dismiss (false) the spawn controls hint; showing restarts its ~9 s timer.
         setControlsHint: (visible: boolean) => useUIStore.getState().setControlsHintVisible(!!visible),
+        // Stage the slow-device "switch to the lite portfolio" offer (normally automatic, once per session).
+        offerLite: () => offerLitePortfolio({ force: true }),
       }),
     [],
   )

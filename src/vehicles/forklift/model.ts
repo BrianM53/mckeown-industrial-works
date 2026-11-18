@@ -37,7 +37,8 @@ function rounded(w: number, h: number, d: number, r: number): THREE.BufferGeomet
   const key = `${w}:${h}:${d}:${r}`
   let g = ROUND_CACHE.get(key)
   if (!g) {
-    g = new RoundedBoxGeometry(w, h, d, 2, r)
+    // one bevel segment: same chunky silhouette, ~1/3 of the triangles (perf budget)
+    g = new RoundedBoxGeometry(w, h, d, 1, r)
     ROUND_CACHE.set(key, g)
   }
   return g
@@ -201,7 +202,7 @@ function buildCarriage(): THREE.BufferGeometry {
 // ---- steering wheel (local +Y = column axis, spins about Y) -------------------------
 function buildSteeringWheel(): THREE.BufferGeometry {
   const b = new GeoBuilder()
-  b.add(new THREE.TorusGeometry(0.16, 0.02, 8, 24), BLACK, [0, 0, 0], [Math.PI / 2, 0, 0])
+  b.add(new THREE.TorusGeometry(0.16, 0.02, 6, 18), BLACK, [0, 0, 0], [Math.PI / 2, 0, 0])
   b.cyl([0, 0, 0], 0.045, 0.04, BLACK, 10)
   for (let i = 0; i < 3; i++) {
     const a = (i * Math.PI * 2) / 3 + Math.PI / 2
@@ -220,20 +221,20 @@ function buildWheel(): THREE.BufferGeometry {
   const b = new GeoBuilder()
   const toX: V3 = [0, 0, Math.PI / 2]
   // tyre: core + rounded shoulders
-  b.cyl([0, 0, 0], 1, 0.78, RUBBER, 28, toX)
-  b.cyl([0.43, 0, 0], 0.93, 0.08, RUBBER, 28, toX)
-  b.cyl([-0.43, 0, 0], 0.93, 0.08, RUBBER, 28, toX)
+  b.cyl([0, 0, 0], 1, 0.78, RUBBER, 20, toX)
+  b.cyl([0.43, 0, 0], 0.93, 0.08, RUBBER, 20, toX)
+  b.cyl([-0.43, 0, 0], 0.93, 0.08, RUBBER, 20, toX)
   // tread blocks (make the spin readable)
-  const lugs = 16
+  const lugs = 12
   for (let i = 0; i < lugs; i++) {
     const a = (i / lugs) * Math.PI * 2
     const off = i % 2 ? 0.17 : -0.17
     b.box([off, Math.cos(a) * 0.97, Math.sin(a) * 0.97], [0.36, 0.1, 0.17], RUBBER, [a, 0, 0])
   }
   // rims (both faces) + yellow hub cap + lug nuts
-  b.cyl([0.47, 0, 0], 0.64, 0.06, lin('#41484A'), 22, toX)
-  b.cyl([-0.47, 0, 0], 0.6, 0.06, lin('#383E40'), 22, toX)
-  b.cyl([0.52, 0, 0], 0.34, 0.06, YELLOW, 18, toX)
+  b.cyl([0.47, 0, 0], 0.64, 0.06, lin('#41484A'), 16, toX)
+  b.cyl([-0.47, 0, 0], 0.6, 0.06, lin('#383E40'), 16, toX)
+  b.cyl([0.52, 0, 0], 0.34, 0.06, YELLOW, 12, toX)
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2
     b.cyl([0.54, Math.cos(a) * 0.47, Math.sin(a) * 0.47], 0.07, 0.07, lin('#AEB6B7'), 6, toX)

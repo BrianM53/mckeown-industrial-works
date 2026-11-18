@@ -67,11 +67,13 @@ describe('PortfolioDocument structure', () => {
   it('embedded variant never nests a <main> (the app provides it)', () => {
     const { container } = render(<PortfolioDocument variant="embedded" notice={<p>notice</p>} />)
     expect(container.querySelectorAll('main')).toHaveLength(0)
-    expect(container.querySelector('#content')).not.toBeNull()
-    // the notice comes right after the skip link and before the masthead
+    // #content is the target of the app top bar's skip link (its first tab stop), so the
+    // embedded document has no skip link of its own (it would be the ~9th tab stop)
+    expect(container.querySelector('#content')).toHaveAttribute('tabindex', '-1')
+    expect(container.querySelector('.pf-skip')).toBeNull()
+    // the notice comes first, before the masthead
     const root = container.querySelector('.pf')!
-    expect(root.children[0]).toHaveClass('pf-skip')
-    expect(root.children[1]).toHaveTextContent('notice')
+    expect(root.children[0]).toHaveTextContent('notice')
   })
 
   it('hides decorative graphics from assistive technology', () => {

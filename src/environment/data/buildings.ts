@@ -238,6 +238,13 @@ function sideRect(b: BuildingInfo, side: DoorSide, from: number, to: number): Re
   }
 }
 
+/**
+ * Buildings whose door header (wall band, trim, drum, sign) renders as a camera-fade group and
+ * has no collider, so the forklift chase camera can follow the forklift out of the bay instead
+ * of being pulled under the header. Nothing that moves reaches the header height (4.7 m+).
+ */
+export const FADE_DOOR_BUILDINGS: ReadonlySet<string> = new Set(['maintenance'])
+
 /** Wall boxes: full-height segments plus a header above the door opening. */
 export function wallBoxes(b: BuildingInfo): WallBox[] {
   const H = b.def.height

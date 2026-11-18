@@ -112,3 +112,37 @@ export function nearFade(armLength: number, near: number = CAMERA.fadeNear, far:
   const t = clamp((armLength - near) / (far - near), 0, 1)
   return t * t * (3 - 2 * t)
 }
+
+const RAD = Math.PI / 180
+
+/**
+ * Vertical FOV (degrees) for the viewport aspect. Landscape keeps `baseFov`;
+ * narrow (portrait) screens widen it so the horizontal view stays at least
+ * `minHorizontalFov`, up to `maxFov` (a 55° vertical FOV on a 9:20 phone would
+ * show only ~28° across).
+ */
+export function fovForAspect(
+  aspect: number,
+  baseFov: number = CAMERA.fov,
+  minHorizontalFov: number = CAMERA.minHorizontalFov,
+  maxFov: number = CAMERA.maxPortraitFov,
+): number {
+  if (!Number.isFinite(aspect) || aspect <= 0) return baseFov
+  const need = (2 * Math.atan(Math.tan((minHorizontalFov * RAD) / 2) / aspect)) / RAD
+  return clamp(need, baseFov, Math.max(baseFov, maxFov))
+}
+
+/** Horizontal FOV (degrees) seen with vertical FOV `fov` at `aspect`. */
+export function horizontalFov(fov: number, aspect: number): number {
+  return (2 * Math.atan(Math.tan((fov * RAD) / 2) * aspect)) / RAD
+}
+
+/**
+ * Extra look-target height on portrait screens (m): aim a little higher so the
+ * worker sits in the lower part of the tall frame and more of the factory shows.
+ * 0 for aspect >= 1, `max` at aspect <= 0.5.
+ */
+export function portraitLookLift(aspect: number, max: number = CAMERA.portraitLookLift): number {
+  if (!Number.isFinite(aspect) || aspect <= 0 || aspect >= 1) return 0
+  return max * clamp((1 - aspect) / 0.5, 0, 1)
+}

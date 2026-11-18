@@ -4,6 +4,12 @@ export function portfolioHref(): string {
   return `${base.endsWith('/') ? base : `${base}/`}portfolio/`
 }
 
+/** The in-app lite view (?lite=1): the same site shell and panels with the HTML portfolio, no 3D. */
+export function liteHref(): string {
+  const base = import.meta.env.BASE_URL || '/'
+  return `${base.endsWith('/') ? base : `${base}/`}?lite=1`
+}
+
 /** Resolve a site-relative asset path (e.g. 'resume/cv.pdf') against the deploy base path. Absolute URLs pass through. */
 export function assetHref(path: string): string {
   if (/^[a-z]+:\/\//i.test(path)) return path

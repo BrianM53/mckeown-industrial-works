@@ -133,6 +133,37 @@ describe('camera rig (third-person, perspective)', () => {
     expect(rig.zoomTarget).toBe(9)
   })
 
+  it('forklift in the maintenance bay: a roomier interior cap than on foot', () => {
+    const rig = new CameraRig()
+    rig.setFollow('forklift')
+    rig.snapBehind(-Math.PI / 2)
+    const c = ctx({ focus: new THREE.Vector3(-11, 0, 29), facing: -Math.PI / 2, interior: 'maintenance' })
+    run(rig, c, 240)
+    expect(rig.arm.length).toBeGreaterThan(CAMERA.interiorMaxDistance + 1.5)
+    expect(rig.arm.length).toBeLessThanOrEqual(FORKLIFT_CAMERA.interiorMaxDistance + 1e-6)
+    // and under the 6.5 m bay roof
+    expect(c.camera.position.y).toBeLessThan(6.5 - CAMERA.eaveMargin)
+  })
+
+  it('portrait phones get a wider vertical FOV and the worker sits lower; landscape is unchanged', () => {
+    const land = new CameraRig()
+    land.snapBehind(0)
+    const cl = ctx()
+    run(land, cl, 5)
+    expect(cl.camera.fov).toBeCloseTo(CAMERA.fov, 3)
+    const port = new CameraRig()
+    port.snapBehind(0)
+    const cp = ctx({ camera: new THREE.PerspectiveCamera(55, 412 / 839, 0.1, 500) })
+    run(port, cp, 5)
+    expect(cp.camera.fov).toBeGreaterThan(CAMERA.fov + 10)
+    expect(cp.camera.fov).toBeLessThanOrEqual(CAMERA.maxPortraitFov + 1e-6)
+    cp.camera.updateMatrixWorld()
+    const head = new THREE.Vector3(0, 1.75, 32).project(cp.camera)
+    const feet = new THREE.Vector3(0, 0.05, 32).project(cp.camera)
+    expect(head.y).toBeLessThan(0.05) // the whole worker sits in the lower half
+    expect(feet.y).toBeGreaterThan(-0.95) // feet still on screen
+  })
+
   it('walking through a doorway glides to the interior framing (no pop)', () => {
     const rig = new CameraRig()
     rig.snapBehind(0)

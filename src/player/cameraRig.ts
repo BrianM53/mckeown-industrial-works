@@ -10,8 +10,10 @@ import {
   ceilingLimit,
   clampPitch,
   decayTrauma,
+  fovForAspect,
   nearestAngle,
   orbitOffset,
+  portraitLookLift,
   shakeNoise,
   springArmStep,
   type ArmState,
@@ -217,8 +219,9 @@ export class CameraRig {
     this.yaw = wrapped
 
     // ---- 4. pivot follows the focus (subtle lag; heights blend between profiles)
+    const aspect = cam.aspect
     const ph = fork ? FORKLIFT_CAMERA.pivotHeight : CAMERA.pivotHeight
-    const lh = fork ? FORKLIFT_CAMERA.lookHeight : CAMERA.lookHeight
+    const lh = (fork ? FORKLIFT_CAMERA.lookHeight : CAMERA.lookHeight) + portraitLookLift(aspect)
     if (this.snapNext) {
       this.pivotHeight = ph
       this.lookHeight = lh
@@ -242,7 +245,7 @@ export class CameraRig {
     const zoneId = ctx.interior && Object.prototype.hasOwnProperty.call(ZONES, ctx.interior) ? (ctx.interior as ZoneId) : null
     const building = zoneId ? ZONES[zoneId].building : undefined
     let capTarget = maxD
-    if (zoneId) capTarget = Math.min(capTarget, CAMERA.interiorMaxDistance)
+    if (zoneId) capTarget = Math.min(capTarget, fork ? FORKLIFT_CAMERA.interiorMaxDistance : CAMERA.interiorMaxDistance)
     if (building) capTarget = Math.min(capTarget, ceilingLimit(this.pivot.y, this.pitch, building.height - CAMERA.eaveMargin))
     capTarget = Math.max(CAMERA.minArm, capTarget)
     this.cap = this.snapNext || !Number.isFinite(this.cap) ? capTarget : damp(this.cap, capTarget, CAMERA.capLambda, dt)
@@ -296,7 +299,8 @@ export class CameraRig {
     if (roll !== 0) cam.rotateZ(roll)
 
     // ---- 9. FOV (subtle speed boost; constant under reduced motion)
-    let fovTarget: number = CAMERA.fov
+    // portrait phones: widen the vertical FOV so the horizontal view stays usable
+    let fovTarget: number = fovForAspect(aspect)
     if (!ctx.reducedMotion) {
       if (fork) fovTarget += FORKLIFT_CAMERA.fovBoost * Math.min(1, Math.abs(ctx.speed) / 5)
       else if (ctx.running) fovTarget += CAMERA.runFovBoost

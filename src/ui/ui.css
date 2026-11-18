@@ -474,6 +474,19 @@
 /* ==========================================================================
    HUD
    ========================================================================== */
+/*
+ * The HUD and touch-control <section>s only group their parts (landmarks for assistive tech).
+ * Every part is position: fixed and z-indexed against the other overlay layers (touch zones <
+ * HUD < touch buttons < fade < bottom HUD stack), so the sections must not create a box or a
+ * stacking context of their own: a fixed full-screen wrapper would flatten that interleaving.
+ * display: contents keeps them out of layout and stacking; visibility checks such as
+ * Playwright's toBeVisible() resolve through their children.
+ */
+.miw-hud,
+.miw-touch {
+  display: contents;
+}
+
 .miw-hud__tl {
   position: fixed;
   top: calc(var(--topbar-h) + var(--safe-top) + 14px);
@@ -589,6 +602,22 @@
     display: none;
   }
 }
+/*
+ * Phones and short viewports (landscape phones, 200% zoom): one line plus the progress bar, so
+ * the strip covers as little of the view (and the spawn wayfinding sign) as possible. The
+ * stage detail is flavour text; the countdown keeps its "stand clear" line.
+ */
+@media (max-width: 520px), (max-height: 520px) {
+  .miw-launch:not(.miw-launch--countdown) .miw-launch__detail {
+    display: none;
+  }
+  .miw-launch {
+    padding-bottom: 6px;
+  }
+  .miw-launch__bar {
+    margin-bottom: 0;
+  }
+}
 .miw-launch--good {
   border-left-color: var(--c-signal-green);
 }
@@ -641,6 +670,13 @@
 .miw-hint.is-leaving {
   opacity: 0;
   transform: translateY(-6px);
+}
+/* touch: the hint sits in the bottom stack, just above the stick and buttons it explains */
+.miw-hud__bc > .miw-hint {
+  animation-name: miw-pop;
+}
+.miw-hud__bc > .miw-hint.is-leaving {
+  transform: translateY(6px);
 }
 /*
  * Small, short desktop viewports (e.g. 200% zoom): the bottom-centre stack reaches up into the
@@ -1046,6 +1082,22 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+.miw-toast__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+}
+/* side by side when they fit, else stacked full-width (phones) */
+.miw-toast__actions .miw-btn {
+  flex: 1 1 auto;
+}
+.miw-toast__actions .miw-btn:not(.miw-btn--primary) {
+  border-color: #6b7a7d;
+}
+.miw-toast__actions .miw-btn:not(.miw-btn--primary):hover {
+  background: rgba(233, 228, 214, 0.1);
+}
 .miw-toast__close {
   display: grid;
   flex: none;
@@ -1074,6 +1126,10 @@
 /* touch: keep clear of the Map / Pause buttons in the top-right column */
 .ui-root[data-mode='game'][data-touch]:not([data-panel]) .miw-toasts {
   right: calc(var(--gutter) + var(--safe-right) + 70px);
+}
+/* offers (sticky toasts with links, e.g. "switch to the lite portfolio") wait while a panel is read */
+.ui-root[data-panel] .miw-toast.is-offer {
+  display: none;
 }
 /* reading a panel: only the two newest toasts stay visible (older ones still expire on their timers) */
 .ui-root[data-panel] .miw-toast:nth-last-child(n + 3) {

@@ -32,7 +32,7 @@ describe('Top bar', () => {
     expect(skip).toHaveAttribute('href', '/portfolio/')
   })
 
-  it('in game mode the first tab stop is a skip link to the portfolio page (not in fallback)', async () => {
+  it('the first tab stop is a skip link: to the portfolio page in game mode, to the content in fallback', async () => {
     const user = userEvent.setup()
     const { unmount } = renderInMode(<TopBar mode="game" />)
     await user.tab()
@@ -40,7 +40,12 @@ describe('Top bar', () => {
     expect(screen.getByTestId('skip-link')).toHaveAttribute('href', '/portfolio/')
     unmount()
     renderInMode(<TopBar mode="fallback" />, 'fallback')
-    expect(screen.queryByTestId('skip-link')).toBeNull()
+    await user.tab()
+    const skip = screen.getByTestId('skip-link')
+    expect(document.activeElement).toBe(skip)
+    expect(skip).toHaveAccessibleName('Skip to content')
+    // PortfolioDocument (embedded by FallbackPortfolio) renders the #content target
+    expect(skip).toHaveAttribute('href', '#content')
   })
 
   it('buttons toggle their panels', async () => {

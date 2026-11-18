@@ -10,7 +10,7 @@ export function Toasts() {
     <section className="miw-toasts" aria-label="Notifications">
       <div className="miw-toasts__list" role="log" aria-live="polite" data-testid="toasts">
       {toasts.map((t) => (
-        <div key={t.id} className={`miw-toast miw-toast--${t.variant ?? t.kind}`}>
+        <div key={t.id} className={`miw-toast miw-toast--${t.variant ?? t.kind}${t.actions ? ' is-offer' : ''}`}>
           <Icon name={t.variant === 'achievement' ? 'trophy' : ICON[t.kind]} size={20} className="miw-toast__icon" />
           <p className="miw-toast__body">
             {t.title && (
@@ -20,6 +20,15 @@ export function Toasts() {
               </>
             )}
             <span className="miw-toast__text">{t.text}</span>
+            {t.actions && (
+              <span className="miw-toast__actions">
+                {t.actions.map((a) => (
+                  <a key={a.href} className={`miw-btn miw-btn--sm${a.primary ? ' miw-btn--primary' : ''}`} href={a.href}>
+                    {a.label}
+                  </a>
+                ))}
+              </span>
+            )}
           </p>
           <button type="button" className="miw-toast__close" aria-label="Dismiss notification" onClick={() => removeToast(t.id)}>
             <Icon name="close" size={14} />

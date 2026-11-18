@@ -1,10 +1,36 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import * as THREE from 'three'
+import { GROUPS } from '@/core/collision'
 import { events } from '@/core/events'
 import { runtime } from '@/core/runtime'
 import { useGameStore } from '@/state/game'
 import { useUIStore } from '@/state/ui'
 import { CHECKPOINTS, SPAWN } from '@/world/layout'
+import { PARK_Y } from './controller'
 import { PlayerSystem, initialSpawn, interiorAt, nearestCheckpoint } from './system'
+
+/** Minimal stand-in for the kinematic body + capsule collider (records what the controller does). */
+function fakePhysics(x: number, z: number) {
+  const t = { x, y: 0.04, z }
+  let enabled = true
+  let groups: number = GROUPS.player
+  const body = {
+    translation: () => ({ ...t }),
+    setTranslation: (p: { x: number; y: number; z: number }) => Object.assign(t, p),
+    setNextKinematicTranslation: (p: { x: number; y: number; z: number }) => Object.assign(t, p),
+  }
+  const collider = {
+    isEnabled: () => enabled,
+    setEnabled: (v: boolean) => {
+      enabled = v
+    },
+    collisionGroups: () => groups,
+    setCollisionGroups: (g: number) => {
+      groups = g
+    },
+  }
+  return { body, collider, state: () => ({ enabled, groups, ...t }) }
+}
 
 describe('player system helpers', () => {
   it('spawns at visitor intake facing north by default', () => {
@@ -88,6 +114,60 @@ describe('player system (no physics attached)', () => {
     sys.cameraService().follow('player')
     expect(sys.ctrl.mode).toBe('foot')
     expect(sys.ctrl.locked).toBe(false)
+  })
+
+  it('every discontinuous move bumps teleportSeq together with the published position', () => {
+    const sys = new PlayerSystem({ x: 0, z: 32, yaw: 0 })
+    sys.setMode('foot')
+    const s0 = runtime.player.teleportSeq
+    sys.playerService().teleport(5, 10, 0)
+    expect(runtime.player.teleportSeq).toBe(s0 + 1)
+    expect(runtime.player.position.x).toBeCloseTo(5)
+    expect(runtime.player.position.z).toBeCloseTo(10)
+    sys.respawn('intake', 'debug')
+    expect(runtime.player.teleportSeq).toBe(s0 + 2)
+    expect(runtime.player.position.z).toBeCloseTo(32)
+    sys.debugPlayer().teleport(-3, 20)
+    expect(runtime.player.teleportSeq).toBe(s0 + 3)
+  })
+
+  it('driving parks the capsule (disabled, no groups, far below); exit after a long drive stands it up without a camera snap', () => {
+    const sys = new PlayerSystem({ x: -11.3, z: 27.3, yaw: Math.PI })
+    sys.setMode('foot')
+    const ph = fakePhysics(-11.3, 27.3)
+    sys.ctrl.body = ph.body as never
+    sys.ctrl.collider = ph.collider as never
+    const cam = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 500)
+    runtime.forklift.position.set(-11, 0, 29)
+    runtime.forklift.yaw = -Math.PI / 2
+    const s0 = runtime.player.teleportSeq
+    sys.playerService().setLocked(true, 'forklift')
+    expect(sys.ctrl.mode).toBe('forklift')
+    expect(ph.state()).toMatchObject({ enabled: false, groups: 0 })
+    expect(ph.state().y).toBeLessThan(PARK_Y + 1)
+    expect(runtime.player.teleportSeq).toBe(s0 + 1) // jumped to the seat
+    expect(runtime.player.position.x).toBeCloseTo(-11)
+    // a long drive east
+    runtime.forklift.position.set(30, 0, 21)
+    sys.frame(1 / 60, cam)
+    expect(runtime.player.position.x).toBeCloseTo(30)
+    const yaw = sys.rig.yaw
+    // vehicles places the worker beside the seat (no fade), then releases the lock
+    sys.playerService().teleport(30, 22.4, 1.2)
+    expect(sys.ctrl.mode).toBe('forklift')
+    expect(ph.state().y).toBeLessThan(PARK_Y + 1) // still parked: no contacts while seated
+    expect(runtime.player.position.x).toBeCloseTo(30) // still the seat
+    sys.playerService().setLocked(false, 'forklift')
+    expect(sys.ctrl.mode).toBe('foot')
+    expect(ph.state()).toMatchObject({ enabled: true, groups: GROUPS.player })
+    expect(ph.state().x).toBeCloseTo(30)
+    expect(ph.state().z).toBeCloseTo(22.4)
+    expect(ph.state().y).toBeGreaterThan(0)
+    expect(runtime.player.position.z).toBeCloseTo(22.4)
+    expect(runtime.player.teleportSeq).toBe(s0 + 2)
+    expect(sys.rig.yaw).toBe(yaw) // measured from the seat (1.4 m), not the capsule (41 m): no snap
+    sys.frame(1 / 60, cam)
+    expect(ph.state().y).toBeGreaterThan(0)
   })
 
   it('anim getter: point after interacting, walk/run by speed, tumble while tackled', () => {

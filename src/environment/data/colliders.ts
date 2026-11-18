@@ -4,7 +4,7 @@
  * lanes, waypoint segments, doors and anchors.
  */
 import type { Rect } from '@/core/types'
-import { BUILDINGS, wallBoxes } from './buildings'
+import { BUILDINGS, FADE_DOOR_BUILDINGS, wallBoxes } from './buildings'
 import {
   ARCH,
   BARRIERS,
@@ -80,7 +80,10 @@ function buildColliders(): ColliderDef[] {
 
   // Buildings: wall segments + door headers (headers block bodies above head height and the camera).
   for (const b of BUILDINGS) {
-    wallBoxes(b).forEach((w, i) => out.push(box(`bldg:${b.id}:${w.kind}:${i}`, 'building', w.rect, w.y0, w.y1)))
+    wallBoxes(b).forEach((w, i) => {
+      if (w.kind === 'header' && FADE_DOOR_BUILDINGS.has(b.id)) return
+      out.push(box(`bldg:${b.id}:${w.kind}:${i}`, 'building', w.rect, w.y0, w.y1))
+    })
   }
 
   // Interior furniture.

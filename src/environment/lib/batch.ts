@@ -161,9 +161,10 @@ export class Batch {
     this.add(key, geometry, _m, col, uvMode)
   }
 
-  /** Merge one key into a geometry (or null when empty). */
-  buildKey(key: string): THREE.BufferGeometry | null {
-    const list = this.parts.get(key)
+  /** Merge one key into a geometry (or null when empty). `filter` keeps only matching parts. */
+  buildKey(key: string, filter?: (geo: THREE.BufferGeometry, matrix: THREE.Matrix4) => boolean): THREE.BufferGeometry | null {
+    const all = this.parts.get(key)
+    const list = all && filter ? all.filter((p) => filter(p.geo, p.matrix)) : all
     if (!list || !list.length) return null
     const tile = this.tiles[key] ?? 2
     let nv = 0
@@ -258,6 +259,30 @@ export class Batch {
     g.computeBoundingSphere()
     g.computeBoundingBox()
     return g
+  }
+
+  /**
+   * Split one key by shadow significance: parts whose oriented size is at least `minMid` m on
+   * their middle axis (or cheap boxes at least `minBox` m long) go to `cast`, the rest
+   * (rivets, bolts, thin pipes, rails, small trims) to `rest`. Same material, so the cost is one
+   * extra main-pass draw call in exchange for a much lighter shadow pass.
+   */
+  buildSplit(key: string, minMid = 0.32, minBox = 0.9): { cast: THREE.BufferGeometry | null; rest: THREE.BufferGeometry | null } {
+    const isCaster = (geo: THREE.BufferGeometry, m: THREE.Matrix4): boolean => {
+      if (!geo.boundingBox) geo.computeBoundingBox()
+      const bb = geo.boundingBox!
+      const e = m.elements
+      const sx = (bb.max.x - bb.min.x) * Math.hypot(e[0], e[1], e[2])
+      const sy = (bb.max.y - bb.min.y) * Math.hypot(e[4], e[5], e[6])
+      const sz = (bb.max.z - bb.min.z) * Math.hypot(e[8], e[9], e[10])
+      const lo = Math.min(sx, sy, sz)
+      const hi = Math.max(sx, sy, sz)
+      const mid = sx + sy + sz - lo - hi
+      const tris = (geo.index ? geo.index.count : geo.getAttribute('position').count) / 3
+      if (tris <= 12) return hi >= minBox && mid >= 0.12
+      return mid >= minMid
+    }
+    return { cast: this.buildKey(key, isCaster), rest: this.buildKey(key, (g, m) => !isCaster(g, m)) }
   }
 
   build(): Map<string, THREE.BufferGeometry> {

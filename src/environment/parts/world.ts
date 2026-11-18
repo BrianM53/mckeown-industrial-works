@@ -35,8 +35,11 @@ export const CASTS: Record<string, boolean> = {
 }
 
 export interface BuiltWorld {
-  statics: { key: string; geometry: THREE.BufferGeometry }[]
+  /** Merged static geometry per material key; `cast` marks the shadow-casting half of a CASTS key. */
+  statics: { key: string; geometry: THREE.BufferGeometry; cast: boolean }[]
   roofs: { id: ZoneId; parts: { key: string; geometry: THREE.BufferGeometry }[] }[]
+  /** Merged camera-fade geometry per material key (rendered with userData.cameraFade). */
+  fade: { key: string; geometry: THREE.BufferGeometry }[]
   kits: Map<KitName, KitInstance[]>
   spinners: Spinner[]
   steam: SteamEmitter[]
@@ -45,7 +48,7 @@ export interface BuiltWorld {
 
 export function buildWorld(q: QualityConfig, atlas: SignAtlas): BuiltWorld {
   const b = new Batch(TILES)
-  const ctx: BuildCtx = { b, atlas, q, spinners: [], steam: [], roofs: new Map(), kits: new Map() }
+  const ctx: BuildCtx = { b, atlas, q, spinners: [], steam: [], roofs: new Map(), kits: new Map(), fade: new Batch(TILES) }
   addBuildings(ctx)
   addStructures(ctx)
   addPerimeter(ctx)
@@ -58,9 +61,18 @@ export function buildWorld(q: QualityConfig, atlas: SignAtlas): BuiltWorld {
 
   const statics: BuiltWorld['statics'] = []
   let triangles = 0
-  for (const [key, geometry] of b.build()) {
-    statics.push({ key, geometry })
-    triangles += (geometry.index?.count ?? 0) / 3
+  // CASTS keys are split by part size so only real silhouettes (walls, frames, tanks, big boxes)
+  // render into the shadow map; rivets, bolts, rails and thin pipes stay out of the shadow pass.
+  for (const key of b.keys) {
+    const parts = CASTS[key] ? b.buildSplit(key) : { cast: null, rest: b.buildKey(key) }
+    for (const [geometry, cast] of [
+      [parts.cast, true],
+      [parts.rest, false],
+    ] as const) {
+      if (!geometry) continue
+      statics.push({ key, geometry, cast })
+      triangles += (geometry.index?.count ?? 0) / 3
+    }
   }
   const roofs: BuiltWorld['roofs'] = []
   for (const [id, rb] of ctx.roofs) {
@@ -70,7 +82,12 @@ export function buildWorld(q: QualityConfig, atlas: SignAtlas): BuiltWorld {
     })
     roofs.push({ id, parts })
   }
-  return { statics, roofs, kits: ctx.kits, spinners: ctx.spinners, steam: ctx.steam, stats: { parts: statics.length, triangles } }
+  const fade: BuiltWorld['fade'] = []
+  for (const [key, geometry] of ctx.fade.build()) {
+    fade.push({ key, geometry })
+    triangles += (geometry.index?.count ?? 0) / 3
+  }
+  return { statics, roofs, fade, kits: ctx.kits, spinners: ctx.spinners, steam: ctx.steam, stats: { parts: statics.length, triangles } }
 }
 
 export function staticMaterial(key: string, sign: THREE.Material, poster: THREE.Material): THREE.Material {

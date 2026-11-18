@@ -42,4 +42,9 @@ export interface BuildCtx {
   roofs: Map<ZoneId, Batch>
   /** Instanced decor kits. */
   kits: Map<KitName, KitInstance[]>
+  /**
+   * Camera-fade batch: parts that may hide while they sit between the camera and the player
+   * (the forklift bay's door header, so the chase cam can follow the forklift out of the bay).
+   */
+  fade: Batch
 }

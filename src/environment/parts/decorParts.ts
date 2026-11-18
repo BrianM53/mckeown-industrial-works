@@ -813,7 +813,8 @@ export function addInteriors(ctx: BuildCtx): void {
   put('rnd', 'S', -35.0, 1.95, 2.3, 1.15, 'whiteboard')
   put('rnd', 'N', -42.2, 2.0, 0.68, 0.95, 'poster:eyes')
   put('radio', 'E', 13.6, 2.2, 0.68, 0.95, 'poster:ears')
-  put('radio', 'W', 11.0, 4.15, 1.1, 0.4, 'onair', 'sign')
+  // Unlit studio plate (poster material: no glow). The live ON AIR light is stations-a's.
+  put('radio', 'W', 11.0, 4.15, 1.1, 0.4, 'onair', 'poster')
   void posterIds
 
   // acoustic foam on the radio booth walls

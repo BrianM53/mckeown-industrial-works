@@ -24,7 +24,7 @@ const DRUM_DARK = lin('#265B88')
 const STENCIL = lin('#E9B63F')
 
 function rounded(b: GeoBuilder, size: [number, number, number], center: [number, number, number], color: THREE.Color, r: number) {
-  const g = new RoundedBoxGeometry(size[0], size[1], size[2], 2, r)
+  const g = new RoundedBoxGeometry(size[0], size[1], size[2], 1, r)
   b.add(g, color, center)
   g.dispose()
 }
@@ -81,18 +81,19 @@ function crate(): THREE.BufferGeometry {
 function cone(): THREE.BufferGeometry {
   const b = new GeoBuilder()
   rounded(b, [0.42, 0.05, 0.42], [0, 0.025, 0], RUBBER, 0.015)
-  b.add(new THREE.CylinderGeometry(0.03, 0.17, 0.64, 16), CONE, [0, 0.05 + 0.32, 0])
-  b.add(new THREE.CylinderGeometry(0.098, 0.122, 0.11, 16, 1, true), REFLECT, [0, 0.4, 0])
-  b.add(new THREE.CylinderGeometry(0.066, 0.083, 0.06, 16, 1, true), REFLECT, [0, 0.55, 0])
+  b.add(new THREE.CylinderGeometry(0.03, 0.17, 0.64, 12), CONE, [0, 0.05 + 0.32, 0])
+  b.add(new THREE.CylinderGeometry(0.098, 0.122, 0.11, 12, 1, true), REFLECT, [0, 0.4, 0])
+  b.add(new THREE.CylinderGeometry(0.066, 0.083, 0.06, 12, 1, true), REFLECT, [0, 0.55, 0])
   b.add(new THREE.CylinderGeometry(0.034, 0.034, 0.012, 10), CONE, [0, 0.695, 0])
   return b.build()
 }
 
 function barrel(): THREE.BufferGeometry {
   const b = new GeoBuilder()
-  b.add(new THREE.CylinderGeometry(0.275, 0.275, 0.86, 22), DRUM, [0, 0.43, 0])
-  for (const y of [0.3, 0.6]) b.add(new THREE.CylinderGeometry(0.29, 0.29, 0.035, 22), DRUM_DARK, [0, y, 0])
-  b.add(new THREE.CylinderGeometry(0.285, 0.285, 0.03, 22), DRUM_DARK, [0, 0.865, 0])
+  b.add(new THREE.CylinderGeometry(0.275, 0.275, 0.86, 16), DRUM, [0, 0.43, 0])
+  // rolling hoops: open bands (their caps were hidden inside the drum anyway)
+  for (const y of [0.3, 0.6]) b.add(new THREE.CylinderGeometry(0.29, 0.29, 0.035, 16, 1, true), DRUM_DARK, [0, y, 0])
+  b.add(new THREE.CylinderGeometry(0.285, 0.285, 0.03, 16), DRUM_DARK, [0, 0.865, 0])
   b.add(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 8), DRUM_DARK, [0.15, 0.885, 0.05])
   b.add(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 8), DRUM_DARK, [-0.16, 0.885, -0.04])
   // a curved-ish label patch (two facets)

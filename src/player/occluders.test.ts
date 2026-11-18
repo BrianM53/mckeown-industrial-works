@@ -71,4 +71,41 @@ describe('selective occluder fading', () => {
     expect(pipe.visible).toBe(true)
     expect(f.trackedCount).toBe(1)
   })
+
+  it('a cleared flag takes effect within one ray pass (no 2 s stale tracking)', () => {
+    const { scene, pipe } = setup()
+    const f = new OccluderFader()
+    const cam = new THREE.Vector3(0, 2, 6)
+    const head = new THREE.Vector3(0, 2, 0)
+    run(f, scene, cam, head, 0.5)
+    expect(pipe.visible).toBe(false)
+    pipe.userData.cameraFade = false // e.g. the forklift once somebody drives it
+    run(f, scene, cam, head, 0.15) // well before the next 2 s re-scan
+    expect(pipe.visible).toBe(true)
+    expect(f.trackedCount).toBe(1)
+    run(f, scene, cam, head, 0.5)
+    expect(pipe.visible).toBe(true)
+  })
+
+  it('skipContaining: never hides the object that contains the focus (the followed forklift)', () => {
+    const scene = new THREE.Scene()
+    const fork = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 3), new THREE.MeshBasicMaterial())
+    fork.position.set(0, 1.1, 0)
+    fork.userData.cameraFade = true
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.1), new THREE.MeshBasicMaterial())
+    sign.position.set(0, 2, 4) // between the chase cam and the forklift
+    sign.userData.cameraFade = true
+    scene.add(fork, sign)
+    scene.updateMatrixWorld(true)
+    const f = new OccluderFader()
+    const cam = new THREE.Vector3(0, 2.5, 8)
+    const focus = new THREE.Vector3(0, 1.6, 0) // inside the forklift
+    for (let t = 0; t < 0.6; t += DT) f.update(DT, scene, cam, focus, { skipContaining: true })
+    expect(fork.visible).toBe(true)
+    expect(sign.visible).toBe(false) // other flagged props still fade
+    // without the option the forklift's own panels count as blockers
+    const g = new OccluderFader()
+    for (let t = 0; t < 0.6; t += DT) g.update(DT, scene, cam, focus)
+    expect(fork.visible).toBe(false)
+  })
 })

@@ -29,7 +29,7 @@ export interface PortfolioDocumentProps {
   basePath?: string
   /** Link to the 3D factory. Defaults to the base path; null hides it (e.g. no WebGL). */
   factoryHref?: string | null
-  /** Optional status notice rendered right after the skip link (used by the in-app fallback). */
+  /** Optional status notice rendered before the masthead (used by the in-app fallback). */
   notice?: ReactNode
 }
 
@@ -39,9 +39,12 @@ export default function PortfolioDocument({ variant = 'page', basePath = '/', fa
   const Content = variant === 'page' ? 'main' : 'div'
   return (
     <div className="pf" id="top" data-variant={variant} data-testid="portfolio-document">
-      <a className="pf-skip" href="#content">
-        Skip to content
-      </a>
+      {/* Embedded in the app, the top bar's skip link (first tab stop, before the bar) targets #content. */}
+      {variant === 'page' && (
+        <a className="pf-skip" href="#content">
+          Skip to content
+        </a>
+      )}
       {notice}
       <Masthead factoryHref={factory} />
       <SectionNav />

@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACHIEVEMENTS } from '@/content/achievements'
 import { SPAWN_HINT } from '@/content/controls'
 import { actions } from '@/core/actions'
@@ -10,14 +10,25 @@ import { useSettings } from '@/state/settings'
 import { useUIStore } from '@/state/ui'
 import { PRINCIPAL_ZONES, ZONES } from '@/world/layout'
 import { useModality } from '../lib/modality'
+import { LITE_OFFER_TEXT, resetLiteOffer } from '../lib/liteOffer'
 import { resetUIState } from '../testing/helpers'
 import UIRoot from '../UIRoot'
 import { HINT_SECONDS } from './ControlsHint'
+import { SLOW_SECONDS } from './useSlowDeviceOffer'
 
 function renderGame() {
   act(() => useGameStore.setState({ status: 'ready', modulesLoaded: 10, modulesTotal: 10 }))
   return render(<UIRoot mode="game" />)
 }
+
+// UIRoot code-splits the game-mode layers (React.lazy: Hud + TouchControls under one Suspense).
+// Resolve those chunks once, with real timers, so every test below renders them synchronously.
+beforeAll(async () => {
+  resetUIState()
+  renderGame()
+  await screen.findByTestId('hud')
+  cleanup()
+})
 
 beforeEach(() => {
   resetUIState()
@@ -161,6 +172,71 @@ describe('controls hint', () => {
     act(() => useUIStore.getState().setControlsHintVisible(false))
     renderGame()
     expect(screen.queryByTestId('controls-hint')).toBeNull()
+  })
+
+  it('sits top-left for mouse/keyboard, and in the bottom stack above the stick on touch', () => {
+    const { unmount } = renderGame()
+    expect(screen.getByTestId('controls-hint').parentElement).toHaveClass('miw-hud__tl')
+    unmount()
+    useModality.setState({ forced: true })
+    renderGame()
+    const hint = screen.getByTestId('controls-hint')
+    // clear of the top of the view (spawn wayfinding sign) on phones
+    expect(hint.parentElement).toHaveClass('miw-hud__bc')
+    for (const line of SPAWN_HINT.touch) expect(hint).toHaveTextContent(line)
+  })
+})
+
+describe('slow-device lite offer', () => {
+  beforeEach(() => {
+    resetLiteOffer()
+    runtime.frame.fps = 60
+  })
+  afterEach(() => {
+    resetLiteOffer()
+    runtime.frame.fps = 60
+    useGameStore.setState({ quality: 'medium' })
+  })
+
+  it('offers the lite portfolio once per session after ~8 s under 18 fps at the low tier', () => {
+    vi.useFakeTimers()
+    useGameStore.setState({ quality: 'low' })
+    runtime.frame.fps = 9
+    const { unmount } = renderGame()
+    act(() => vi.advanceTimersByTime((SLOW_SECONDS - 1) * 1000))
+    expect(screen.queryByText(LITE_OFFER_TEXT)).toBeNull()
+    act(() => vi.advanceTimersByTime(1500))
+    const toast = screen.getByText(LITE_OFFER_TEXT).closest('.miw-toast') as HTMLElement
+    expect(within(toast).getByRole('link', { name: 'Switch to lite' })).toHaveAttribute('href', '/?lite=1')
+    expect(within(toast).getByRole('link', { name: 'Portfolio page' })).toHaveAttribute('href', '/portfolio/')
+    // non-blocking but sticky: still offered long after an ordinary toast would have expired
+    act(() => vi.advanceTimersByTime(60_000))
+    expect(screen.getByText(LITE_OFFER_TEXT)).toBeInTheDocument()
+    fireEvent.click(within(toast).getByRole('button', { name: 'Dismiss notification' }))
+    expect(screen.queryByText(LITE_OFFER_TEXT)).toBeNull()
+    // once per session
+    unmount()
+    renderGame()
+    act(() => vi.advanceTimersByTime(30_000))
+    expect(screen.queryByText(LITE_OFFER_TEXT)).toBeNull()
+  })
+
+  it('stays quiet above the low tier, at playable frame rates and while a panel is open', () => {
+    vi.useFakeTimers()
+    runtime.frame.fps = 9
+    useGameStore.setState({ quality: 'medium' })
+    renderGame()
+    act(() => vi.advanceTimersByTime(30_000)) // medium: the perf monitor can still step down
+    act(() => useGameStore.setState({ quality: 'low' }))
+    runtime.frame.fps = 24
+    act(() => vi.advanceTimersByTime(30_000))
+    runtime.frame.fps = 9
+    act(() => useUIStore.getState().openPanel('help'))
+    act(() => vi.advanceTimersByTime(30_000)) // reading a panel: the frame rate does not matter
+    expect(screen.queryByText(LITE_OFFER_TEXT)).toBeNull()
+    act(() => useUIStore.getState().closePanel())
+    act(() => vi.advanceTimersByTime((SLOW_SECONDS + 1) * 1000))
+    expect(screen.getByText(LITE_OFFER_TEXT)).toBeInTheDocument()
   })
 })
 

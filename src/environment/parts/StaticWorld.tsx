@@ -16,22 +16,30 @@ export function StaticMeshes({ world, sign, poster, shadows }: { world: BuiltWor
   useEffect(
     () => () => {
       for (const s of world.statics) s.geometry.dispose()
+      for (const s of world.fade) s.geometry.dispose()
     },
     [world],
   )
+  const fadeData = useMemo(() => ({ cameraFade: true }), [])
   return (
     <group name="env-static">
       {world.statics.map((s) => (
         <mesh
-          key={s.key}
-          name={`env-static:${s.key}`}
+          key={`${s.key}:${s.cast ? 'c' : 'n'}`}
+          name={`env-static:${s.key}${s.cast ? '' : ':ns'}`}
           geometry={s.geometry}
           material={staticMaterial(s.key, sign, poster)}
-          castShadow={shadows && !!CASTS[s.key]}
+          castShadow={shadows && s.cast}
           receiveShadow={s.key !== 'far' && s.key !== 'farGlow' && s.key !== 'glow'}
           renderOrder={s.key === 'glass' ? 2 : 0}
         />
       ))}
+      {/* Forklift-bay door header: hides while it blocks the chase camera (player occluder fader). */}
+      <group name="env-fade" userData={fadeData}>
+        {world.fade.map((s) => (
+          <mesh key={s.key} name={`env-fade:${s.key}`} geometry={s.geometry} material={staticMaterial(s.key, sign, poster)} castShadow={shadows && !!CASTS[s.key]} receiveShadow />
+        ))}
+      </group>
     </group>
   )
 }
@@ -108,6 +116,14 @@ export function Roofs({ world, shadows }: { world: BuiltWorld; shadows: boolean 
   )
 }
 
+/**
+ * Only tall kits cast: light poles throw the long readable shadows. Pallets, crates, barrels,
+ * bollards, hydrants, tyres and planters are small, numerous and instanced world-wide (their
+ * bounding sphere never leaves the shadow frustum), so their shadow pass cost ~35k triangles for
+ * contact shadows the ground AO already suggests.
+ */
+const KIT_CASTS = new Set<KitName>(['pole'])
+
 function KitMesh({ name, list, shadows }: { name: KitName; list: KitInstance[]; shadows: boolean }) {
   const mesh = useMemo(() => {
     const mat = name === 'lens' ? envMats.glow() : envMats.kit()
@@ -124,7 +140,7 @@ function KitMesh({ name, list, shadows }: { name: KitName; list: KitInstance[]; 
     return m
   }, [name, list])
   useEffect(() => {
-    mesh.castShadow = shadows && name !== 'lens' && name !== 'cone'
+    mesh.castShadow = shadows && KIT_CASTS.has(name)
   }, [mesh, shadows, name])
   useEffect(() => () => mesh.dispose(), [mesh])
   return <primitive object={mesh} />

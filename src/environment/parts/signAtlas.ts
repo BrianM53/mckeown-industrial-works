@@ -165,7 +165,7 @@ export function getSignAtlas(scale: number, anisotropy: number): SignAtlas {
   items.push({ key: 'trailer', w: 900, h: 200, bg: '#e9e6dc', draw: (c, w, h) => drawTruckSide(c, w, h, 'McKEOWN FREIGHT', '#638C88', 'SHIPPING ROCKET PARTS SINCE LAST TUESDAY') })
   items.push({ key: 'container:rust', w: 520, h: 224, bg: '#A95E39', draw: (c, w, h) => drawContainerSide(c, w, h, '#A95E39', 'MIWU 314159 2') })
   items.push({ key: 'container:blue', w: 520, h: 224, bg: '#4F86A8', draw: (c, w, h) => drawContainerSide(c, w, h, '#4F86A8', 'MIWU 271828 1') })
-  items.push({ key: 'onair', w: 300, h: 110, bg: '#3a0d0b', draw: (c, w, h) => drawOnAir(c, w, h) })
+  items.push({ key: 'onair', w: 300, h: 110, bg: '#2a2d30', draw: (c, w, h) => drawOnAir(c, w, h) })
   items.push({
     key: 'watertower',
     w: 760,

@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { gaitFrequency } from '@/player/gait'
+import { useGameStore } from '@/state/game'
 import { PALETTE } from './palette'
 
 /**
@@ -15,6 +16,7 @@ import { PALETTE } from './palette'
  *     look={{ helmet: '#E9B63F', vest: '#E57D35', accessory: 'clipboard', face: 'mustache' }}
  *     anim={() => state.anim}      // 'idle' | 'walk' | 'run' | 'work' | 'wave' | 'point' | 'panic' | 'cheer'
  *                                  // | 'kick' | 'carry' | 'sit' | 'sleep' | 'tumble' | 'tackle'
+ *                                  // | 'facepalm' | 'thumbsup'
  *     speed={() => state.speed}    // m/s, drives the walk/run cadence (feet don't skate)
  *     lookYaw={() => headYaw}      // optional glance (rad, relative to the body), e.g. at the visitor
  *     seed={7} />                  // desyncs idle breathing / fidgets between workers
@@ -22,7 +24,10 @@ import { PALETTE } from './palette'
  * Rendering: ONE skinned mesh per worker (one draw call + one shadow call).
  * The body is built from chunky primitives merged into a single geometry with
  * baked vertex colors (cached per look — reuse a handful of looks) and rigidly
- * skinned to a 13-bone skeleton. A shared material reads per-vertex
+ * skinned to a 13-bone skeleton. Distance LOD: beyond ~16 m from the camera the
+ * mesh swaps to a ~1k-triangle version of the same look (same skeleton, so the
+ * animation is unchanged), and beyond ~22 m it stops casting a shadow
+ * (distances x1.5 on the high tier). A shared material reads per-vertex
  * roughness/emissive, so hi-vis vests and reflective stripes pop without extra
  * materials. Idle workers fidget (look around, tip the hard hat, check a
  * watch, stretch, shift weight).
@@ -48,6 +53,8 @@ export type WorkerAnim =
   | 'point'
   | 'kick'
   | 'tackle'
+  | 'facepalm'
+  | 'thumbsup'
 
 export type WorkerAccessory = 'none' | 'clipboard' | 'wrench' | 'headset' | 'whistle' | 'mug' | 'tablet'
 
@@ -171,6 +178,7 @@ function col(hex: string, mul = 1): THREE.Color {
 
 class PartList {
   parts: Part[] = []
+  constructor(private readonly hi: boolean) {}
   add(
     geo: THREE.BufferGeometry,
     bone: BoneId,
@@ -187,9 +195,9 @@ class PartList {
     this.parts.push({ geo: g, bone, color, rough: opts.rough ?? 0.8, emis: opts.emis ?? 0 })
   }
   /** A capsule spanning two points. */
-  limb(a: [number, number, number], b: [number, number, number], radius: number, bone: BoneId, color: THREE.Color, rough = 0.85): void {
+  limb(a: [number, number, number], b: [number, number, number], radius: number, bone: BoneId, color: THREE.Color, rough = 0.85, caps = 3, radial = 10): void {
     const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])
-    const geo = new THREE.CapsuleGeometry(radius, Math.max(0.01, len - radius * 0.6), 3, 10)
+    const geo = new THREE.CapsuleGeometry(radius, Math.max(0.01, len - radius * 0.6), this.hi ? caps : 1, this.hi ? radial : 6)
     _dir.set(a[0] - b[0], a[1] - b[1], a[2] - b[2]).normalize()
     _q.setFromUnitVectors(_up, _dir)
     _p.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
@@ -204,8 +212,14 @@ function lookKey(l: WorkerLook): string {
   return [l.helmet, l.vest, l.shirt, l.pants, l.skin, l.boots, l.accessory, l.stripe, l.helmetStripe ?? '', l.gloves ?? '', l.face ?? ''].join('|')
 }
 
-function buildWorkerGeometry(look: WorkerLook): THREE.BufferGeometry {
-  const P = new PartList()
+/** Geometry detail: 0 = full (near the camera), 1 = distant LOD (~1k triangles). */
+export type WorkerLod = 0 | 1
+
+function buildWorkerGeometry(look: WorkerLook, lod: WorkerLod = 0): THREE.BufferGeometry {
+  // LOD 1 keeps every silhouette part and color (same skeleton) with far fewer
+  // segments, and drops details that are sub-pixel at 16 m+ (eyes, laces, badges…).
+  const hi = lod === 0
+  const P = new PartList(hi)
   const c = {
     helmet: col(look.helmet),
     helmetAccent: look.helmetStripe ? col(look.helmetStripe) : col(look.helmet, 0.82),
@@ -229,10 +243,13 @@ function buildWorkerGeometry(look: WorkerLook): THREE.BufferGeometry {
   }
 
   // --- primitives (shared shapes, cloned per part) ---
-  const rbox = (w: number, h: number, d: number, r = 0.04) => new RoundedBoxGeometry(w, h, d, 1, Math.min(r, w / 2 - 1e-3, h / 2 - 1e-3, d / 2 - 1e-3))
+  const rbox = (w: number, h: number, d: number, r = 0.04) =>
+    hi ? new RoundedBoxGeometry(w, h, d, 1, Math.min(r, w / 2 - 1e-3, h / 2 - 1e-3, d / 2 - 1e-3)) : new THREE.BoxGeometry(w, h, d)
   const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d)
-  const sphere = (r: number, ws = 10, hs = 8) => new THREE.SphereGeometry(r, ws, hs)
-  const cyl = (rt: number, rb: number, h: number, seg = 12, open = false) => new THREE.CylinderGeometry(rt, rb, h, seg, 1, open)
+  const sphere = (r: number, ws = 10, hs = 8) => new THREE.SphereGeometry(r, hi ? ws : Math.max(6, ws >> 1), hi ? hs : Math.max(4, hs >> 1))
+  const cyl = (rt: number, rb: number, h: number, seg = 12, open = false) => new THREE.CylinderGeometry(rt, rb, h, hi ? seg : Math.max(6, seg >> 1), 1, open)
+  const torus = (r: number, tube: number, rs: number, ts: number, arc = Math.PI * 2) =>
+    new THREE.TorusGeometry(r, tube, hi ? rs : 3, hi ? ts : Math.max(6, ts >> 1), arc)
 
   // --- legs ---
   for (const side of [-1, 1] as const) {
@@ -245,55 +262,63 @@ function buildWorkerGeometry(look: WorkerLook): THREE.BufferGeometry {
     P.add(rbox(0.195, 0.18, 0.25, 0.05), kn, c.boots, [x, 0.12, -0.005], { rough: 0.6 })
     P.add(rbox(0.19, 0.125, 0.16, 0.05), kn, c.boots, [x, 0.07, -0.13], { rough: 0.6 })
     P.add(box(0.205, 0.04, 0.35), kn, c.sole, [x, 0.02, -0.05], { rough: 0.9 })
-    P.add(box(0.07, 0.012, 0.09), kn, c.badge, [x, 0.168, -0.11], { rot: [-0.5, 0, 0], rough: 0.8 })
-    P.add(cyl(0.108, 0.108, 0.055, 12), kn, c.boots, [x, 0.215, 0], { rough: 0.7 })
+    if (hi) {
+      P.add(box(0.07, 0.012, 0.09), kn, c.badge, [x, 0.168, -0.11], { rot: [-0.5, 0, 0], rough: 0.8 })
+      P.add(cyl(0.108, 0.108, 0.055, 12), kn, c.boots, [x, 0.215, 0], { rough: 0.7 })
+    }
   }
 
   // --- pelvis / belt ---
   P.add(rbox(0.37, 0.22, 0.25, 0.05), B.hips, c.pants, [0, 0.95, 0])
   P.add(box(0.385, 0.055, 0.262), B.hips, c.belt, [0, 1.04, 0], { rough: 0.6 })
-  P.add(box(0.075, 0.045, 0.02), B.hips, c.metal, [0, 1.04, -0.135], { rough: 0.3, emis: 0.04 })
-  P.add(rbox(0.085, 0.13, 0.095, 0.02), B.hips, c.leather, [0.22, 0.965, 0.025], { rough: 0.7 })
+  if (hi) {
+    P.add(box(0.075, 0.045, 0.02), B.hips, c.metal, [0, 1.04, -0.135], { rough: 0.3, emis: 0.04 })
+    P.add(rbox(0.085, 0.13, 0.095, 0.02), B.hips, c.leather, [0.22, 0.965, 0.025], { rough: 0.7 })
+  }
 
   // --- torso: shirt, hi-vis vest, reflective stripes ---
   P.add(rbox(0.4, 0.47, 0.245, 0.06), B.spine, c.shirt, [0, 1.285, 0])
   P.add(rbox(0.445, 0.4, 0.29, 0.06), B.spine, c.vest, [0, 1.265, 0], { rough: 0.7, emis: 0.2 })
-  P.add(box(0.075, 0.385, 0.012), B.spine, c.shirt, [0, 1.27, -0.149])
+  if (hi) P.add(box(0.075, 0.385, 0.012), B.spine, c.shirt, [0, 1.27, -0.149])
   for (const y of [1.15, 1.285]) P.add(box(0.452, 0.042, 0.297), B.spine, c.stripe, [0, y, 0], { rough: 0.38, emis: 0.42 })
   for (const sx of [-0.115, 0.115]) {
     P.add(box(0.042, 0.4, 0.01), B.spine, c.stripe, [sx, 1.265, -0.148], { rough: 0.38, emis: 0.42 })
     P.add(box(0.042, 0.4, 0.01), B.spine, c.stripe, [sx, 1.265, 0.148], { rough: 0.38, emis: 0.42 })
     P.add(box(0.13, 0.035, 0.29), B.spine, c.vest, [sx * 1.17, 1.468, 0], { rough: 0.7, emis: 0.2 })
   }
-  P.add(box(0.085, 0.07, 0.012), B.spine, c.vestDark, [-0.12, 1.37, -0.152], { rough: 0.8 })
-  P.add(box(0.07, 0.045, 0.008), B.spine, c.badge, [0.12, 1.385, -0.152], { rough: 0.5, emis: 0.05 })
-  P.add(new THREE.TorusGeometry(0.085, 0.028, 6, 14), B.spine, c.shirt, [0, 1.495, 0], { rot: [Math.PI / 2, 0, 0] })
+  if (hi) {
+    P.add(box(0.085, 0.07, 0.012), B.spine, c.vestDark, [-0.12, 1.37, -0.152], { rough: 0.8 })
+    P.add(box(0.07, 0.045, 0.008), B.spine, c.badge, [0.12, 1.385, -0.152], { rough: 0.5, emis: 0.05 })
+    P.add(torus(0.085, 0.028, 6, 14), B.spine, c.shirt, [0, 1.495, 0], { rot: [Math.PI / 2, 0, 0] })
+  }
 
   // --- neck & head ---
   P.add(cyl(0.06, 0.065, 0.12, 10), B.neck, c.skin, [0, 1.56, 0], { rough: 0.7 })
   P.add(sphere(0.148, 16, 12), B.head, c.skin, [0, 1.705, 0], { scale: [1, 1.06, 1], rough: 0.7 })
-  P.add(sphere(0.03, 8, 6), B.head, c.skinDark, [0, 1.685, -0.147], { rough: 0.7 })
-  for (const sx of [-1, 1]) {
-    P.add(sphere(0.02, 8, 6), B.head, c.eye, [0.052 * sx, 1.722, -0.132], { scale: [1, 1.2, 0.6], rough: 0.3 })
-    P.add(sphere(0.036, 8, 6), B.head, c.skin, [0.147 * sx, 1.7, 0.005], { scale: [0.55, 1, 0.9], rough: 0.7 })
+  if (hi) {
+    P.add(sphere(0.03, 8, 6), B.head, c.skinDark, [0, 1.685, -0.147], { rough: 0.7 })
+    for (const sx of [-1, 1]) {
+      P.add(sphere(0.02, 8, 6), B.head, c.eye, [0.052 * sx, 1.722, -0.132], { scale: [1, 1.2, 0.6], rough: 0.3 })
+      P.add(sphere(0.036, 8, 6), B.head, c.skin, [0.147 * sx, 1.7, 0.005], { scale: [0.55, 1, 0.9], rough: 0.7 })
+    }
   }
   if (look.face === 'mustache') {
     P.add(rbox(0.11, 0.028, 0.035, 0.012), B.head, c.hair, [0, 1.655, -0.138], { rough: 0.9 })
   } else if (look.face === 'beard') {
     P.add(sphere(0.12, 12, 8), B.head, c.hair, [0, 1.625, -0.035], { scale: [1.1, 0.75, 1.0], rough: 0.95 })
-  } else if (look.face === 'glasses') {
-    for (const sx of [-1, 1]) P.add(new THREE.TorusGeometry(0.03, 0.007, 4, 12), B.head, c.eye, [0.052 * sx, 1.722, -0.142], { rough: 0.3 })
+  } else if (look.face === 'glasses' && hi) {
+    for (const sx of [-1, 1]) P.add(torus(0.03, 0.007, 4, 12), B.head, c.eye, [0.052 * sx, 1.722, -0.142], { rough: 0.3 })
     P.add(box(0.04, 0.008, 0.008), B.head, c.eye, [0, 1.726, -0.146], { rough: 0.3 })
   }
 
   // --- hard hat: dome, brim with front peak, ridge (+ reflective band) ---
-  P.add(new THREE.SphereGeometry(0.172, 18, 9, 0, Math.PI * 2, 0, Math.PI / 2), B.head, c.helmet, [0, 1.765, 0], {
+  P.add(new THREE.SphereGeometry(0.172, hi ? 18 : 10, hi ? 9 : 4, 0, Math.PI * 2, 0, Math.PI / 2), B.head, c.helmet, [0, 1.765, 0], {
     scale: [1.02, 0.92, 1.1],
     rough: 0.32,
   })
   P.add(cyl(0.2, 0.21, 0.024, 22), B.head, c.helmet, [0, 1.768, -0.022], { scale: [1, 1, 1.15], rough: 0.32 })
   // ridge arc from front to back over the crown (stops short of the brim so it never reads as a horn)
-  P.add(new THREE.TorusGeometry(0.163, 0.019, 6, 16, Math.PI * 0.74), B.head, c.helmetAccent, [0, 1.765, 0], {
+  P.add(torus(0.163, 0.019, 6, 16, Math.PI * 0.74), B.head, c.helmetAccent, [0, 1.765, 0], {
     rot: [0, Math.PI / 2, Math.PI * 0.13],
     scale: [1.02, 0.92, 1.1],
     rough: 0.35,
@@ -312,8 +337,10 @@ function buildWorkerGeometry(look: WorkerLook): THREE.BufferGeometry {
     const x2 = 0.315 * side
     P.limb([x0, 1.47, 0], [x1, 1.15, 0.01], 0.075, sh, c.shirt)
     P.limb([x1, 1.19, 0.01], [x2, 0.95, 0], 0.066, el, c.shirt)
-    P.add(cyl(0.073, 0.07, 0.06, 10), el, c.glovesDark, [x2, 0.955, 0], { rough: 0.8 })
+    if (hi) P.add(cyl(0.073, 0.07, 0.06, 10), el, c.glovesDark, [x2, 0.955, 0], { rough: 0.8 })
     P.add(sphere(0.072, 10, 8), el, c.gloves, [x2 + 0.003 * side, 0.885, -0.006], { scale: [0.85, 1.1, 1], rough: 0.75 })
+    // thumb on the front-inner side of the fist: forward when the arm hangs, up in 'thumbsup'
+    if (hi) P.limb([x2 - 0.022 * side, 0.9, -0.05], [x2 - 0.022 * side, 0.875, -0.118], 0.024, el, c.gloves, 0.75, 2, 6)
   }
 
   // --- accessories ---
@@ -332,11 +359,11 @@ function buildWorkerGeometry(look: WorkerLook): THREE.BufferGeometry {
       break
     case 'wrench':
       P.add(box(0.036, 0.3, 0.022), B.elR, c.metal, off(handR, 0, -0.11, -0.03), { rough: 0.3, emis: 0.03 })
-      P.add(new THREE.TorusGeometry(0.036, 0.014, 6, 12, Math.PI * 1.6), B.elR, c.metal, off(handR, 0, -0.29, -0.03), { rot: [0, 0, -Math.PI * 0.3], rough: 0.3 })
+      if (hi) P.add(torus(0.036, 0.014, 6, 12, Math.PI * 1.6), B.elR, c.metal, off(handR, 0, -0.29, -0.03), { rot: [0, 0, -Math.PI * 0.3], rough: 0.3 })
       break
     case 'mug':
       P.add(cyl(0.045, 0.042, 0.1, 12), B.elR, col('#efe9dd'), off(handR, 0, -0.02, -0.075), { rough: 0.4 })
-      P.add(new THREE.TorusGeometry(0.028, 0.009, 5, 10), B.elR, col('#efe9dd'), off(handR, 0.045, -0.02, -0.075), { rot: [0, Math.PI / 2, 0], rough: 0.4 })
+      if (hi) P.add(torus(0.028, 0.009, 5, 10), B.elR, col('#efe9dd'), off(handR, 0.045, -0.02, -0.075), { rot: [0, Math.PI / 2, 0], rough: 0.4 })
       break
     case 'headset':
       for (const sx of [-1, 1]) P.add(cyl(0.052, 0.052, 0.045, 12), B.head, col('#2b2f31'), [0.158 * sx, 1.7, 0.005], { rot: [0, 0, Math.PI / 2], rough: 0.5 })
@@ -344,7 +371,7 @@ function buildWorkerGeometry(look: WorkerLook): THREE.BufferGeometry {
       P.add(sphere(0.016, 8, 6), B.head, col('#2b2f31'), [-0.125, 1.635, -0.135], { rough: 0.5 })
       break
     case 'whistle':
-      P.add(new THREE.TorusGeometry(0.1, 0.008, 4, 18), B.spine, col('#c0392b'), [0, 1.43, -0.06], { rot: [1.2, 0, 0], rough: 0.7 })
+      if (hi) P.add(torus(0.1, 0.008, 4, 18), B.spine, col('#c0392b'), [0, 1.43, -0.06], { rot: [1.2, 0, 0], rough: 0.7 })
       P.add(rbox(0.065, 0.032, 0.035, 0.012), B.spine, col('#d9a53b'), [0, 1.36, -0.165], { rough: 0.3, emis: 0.05 })
       break
     default:
@@ -424,15 +451,31 @@ function mergeParts(parts: Part[]): THREE.BufferGeometry {
 export const WORKER_BONE_COUNT = BONES.length
 
 /** Cached merged worker geometry for a full look (shared by every worker wearing it). */
-export function getWorkerGeometry(look: WorkerLook): THREE.BufferGeometry {
-  const key = lookKey(look)
+export function getWorkerGeometry(look: WorkerLook, lod: WorkerLod = 0): THREE.BufferGeometry {
+  const key = lod ? `${lookKey(look)}|lod${lod}` : lookKey(look)
   let g = geoCache.get(key)
   if (!g) {
-    g = buildWorkerGeometry(look)
+    g = buildWorkerGeometry(look, lod)
     geoCache.set(key, g)
   }
   return g
 }
+
+/**
+ * Distance LOD / shadow thresholds (m, camera to the worker) with hysteresis.
+ * The high tier scales them by `highScale`.
+ */
+export const WORKER_LOD = {
+  /** Switch to the LOD mesh beyond this… */
+  lodOut: 16,
+  /** …and back to the full mesh inside this. */
+  lodIn: 14,
+  /** Stop casting a shadow beyond this… */
+  shadowOut: 22,
+  /** …and cast again inside this. */
+  shadowIn: 20,
+  highScale: 1.5,
+} as const
 
 // ---------------------------------------------------------------------------
 // Material: vertex colors + per-vertex roughness / emissive (one shader for all workers)
@@ -470,6 +513,10 @@ interface Rig {
   bones: THREE.Bone[]
   skeleton: THREE.Skeleton
   ownMaterial: THREE.MeshStandardMaterial | null
+  /** Showing the distant LOD geometry. */
+  far: boolean
+  /** Shadow culled by distance. */
+  shadowOff: boolean
 }
 
 const BOUNDS = new THREE.Sphere(new THREE.Vector3(0, 0.9, 0), 1.75)
@@ -489,7 +536,7 @@ function createRig(geometry: THREE.BufferGeometry, dithered: boolean): Rig {
   mesh.bind(skeleton)
   mesh.boundingSphere = BOUNDS.clone()
   mesh.name = 'worker'
-  return { mesh, bones, skeleton, ownMaterial }
+  return { mesh, bones, skeleton, ownMaterial, far: false, shadowOff: false }
 }
 
 // ---------------------------------------------------------------------------
@@ -739,6 +786,40 @@ function computePose(s: AnimState, a: WorkerAnim, v: number, seed: number, dt: n
       T.spineRx = Math.sin(t * 1.4) * 0.025
       break
     }
+    case 'facepalm': {
+      // right palm over the face, head bowed, slow disbelieving shake; left arm limp
+      s.phase += dt * 4.2
+      T.spineRx = -0.12 + Math.sin(t * 1.3 + seed) * 0.012
+      T.headRx = -0.32
+      T.headRy = 0.12 + Math.sin(s.phase) * 0.07
+      T.shRx = 1.85
+      T.shRy = 0.6
+      T.shRz = -0.6
+      T.elR = 1.1
+      T.shLz = -0.04
+      T.elL = 0.1
+      T.hipsRz = 0.03
+      T.thLz = -0.03
+      T.thRz = -0.03
+      break
+    }
+    case 'thumbsup': {
+      // right fist forward at chest height, thumb up; a proud little pump and nod
+      s.phase += dt * 5
+      const pump = Math.sin(s.phase)
+      T.shRx = 0.4
+      T.shRz = 0.16
+      T.elR = 1.5 + pump * 0.07
+      T.spineRx = 0.04
+      T.spineRy = -0.1
+      T.headRx = 0.05 + Math.max(0, pump) * 0.06
+      T.shLz = -0.1
+      T.elL = 0.22
+      T.hipsRz = -0.03
+      T.thLz = 0.03
+      T.thRz = 0.03
+      break
+    }
     case 'tumble': {
       s.spin += dt * 10.5
       const fl = Math.sin(t * 14)
@@ -829,7 +910,7 @@ function applyFidget(s: AnimState, T: Pose, t: number): void {
 }
 
 /** Animations in which a head glance (lookYaw) makes sense. */
-const LOOK_ANIMS = new Set<WorkerAnim>(['idle', 'walk', 'run', 'work', 'point', 'carry', 'sit', 'wave', 'cheer'])
+const LOOK_ANIMS = new Set<WorkerAnim>(['idle', 'walk', 'run', 'work', 'point', 'carry', 'sit', 'wave', 'cheer', 'thumbsup'])
 
 function applyPose(bones: THREE.Bone[], p: Pose, extraSpin: number): void {
   const root = bones[B.root]
@@ -850,6 +931,36 @@ function applyPose(bones: THREE.Bone[], p: Pose, extraSpin: number): void {
 }
 
 // ---------------------------------------------------------------------------
+// Distance LOD + shadow culling (per frame, allocation-free)
+// ---------------------------------------------------------------------------
+
+/**
+ * LOD / shadow state for a worker `dist2` (squared metres) from the camera, with
+ * hysteresis around the previous state. `scale` widens the ranges (high tier).
+ * Writes into and returns `prev`.
+ */
+export function workerLodState(dist2: number, prev: { far: boolean; shadowOff: boolean }, scale = 1): { far: boolean; shadowOff: boolean } {
+  if (!Number.isFinite(dist2)) return prev
+  const lodR = (prev.far ? WORKER_LOD.lodIn : WORKER_LOD.lodOut) * scale
+  const shR = (prev.shadowOff ? WORKER_LOD.shadowIn : WORKER_LOD.shadowOut) * scale
+  prev.far = dist2 > lodR * lodR
+  prev.shadowOff = dist2 > shR * shR
+  return prev
+}
+
+function updateLod(rig: Rig, cam: THREE.Vector3, full: THREE.BufferGeometry, lod: THREE.BufferGeometry, castShadow: boolean): void {
+  const e = rig.mesh.matrixWorld.elements // as of the last rendered frame: plenty for LOD
+  const dx = e[12] - cam.x
+  const dy = e[13] - cam.y
+  const dz = e[14] - cam.z
+  const wasFar = rig.far
+  workerLodState(dx * dx + dy * dy + dz * dz, rig, useGameStore.getState().quality === 'high' ? WORKER_LOD.highScale : 1)
+  if (rig.far !== wasFar) rig.mesh.geometry = rig.far ? lod : full
+  const cast = castShadow && !rig.shadowOff
+  if (rig.mesh.castShadow !== cast) rig.mesh.castShadow = cast
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -858,11 +969,13 @@ export function WorkerModel({ look: lookPatch, anim = 'idle', speed = 0, seed = 
   const key = lookKey(look)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const geometry = useMemo(() => getWorkerGeometry(look), [key])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lodGeometry = useMemo(() => getWorkerGeometry(look, 1), [key])
   const dithered = opacity !== undefined
   const rig = useMemo(() => createRig(geometry, dithered), [geometry, dithered])
 
   useEffect(() => {
-    rig.mesh.castShadow = castShadow
+    rig.mesh.castShadow = castShadow && !rig.shadowOff
     rig.mesh.receiveShadow = castShadow
   }, [rig, castShadow])
 
@@ -892,9 +1005,10 @@ export function WorkerModel({ look: lookPatch, anim = 'idle', speed = 0, seed = 
     }
   }
 
-  useFrame((_, rawDt) => {
+  useFrame((frameState, rawDt) => {
     const s = state.current
     if (!s) return
+    updateLod(rig, frameState.camera.position, geometry, lodGeometry, castShadow)
     const dt = Math.min(Math.max(rawDt, 0), 0.05)
     s.t += dt
     const a = resolve(anim, 'idle')

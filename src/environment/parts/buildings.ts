@@ -10,7 +10,7 @@ import * as THREE from 'three'
 import { createRng } from '@/core/rng'
 import type { DoorSide } from '@/world/layout'
 import { PALETTE } from '@/world/palette'
-import { BUILDINGS, sideFace, sideNormal, sideRange, sideYaw, wallBoxes, windowSpots, type BuildingInfo } from '../data/buildings'
+import { BUILDINGS, FADE_DOOR_BUILDINGS, sideFace, sideNormal, sideRange, sideYaw, wallBoxes, windowSpots, type BuildingInfo } from '../data/buildings'
 import { POSTERS } from '../data/text'
 import { Batch, prismGeometry, unitCylinder } from '../lib/batch'
 import { buildingSignSpot, EMERGENCY_BEACONS, RIGHT, ZONE_BEACONS } from './beaconData'
@@ -115,9 +115,12 @@ function addBuilding(ctx: BuildCtx, bi: BuildingInfo): void {
   const inner = (s: DoorSide) => face(bi, s, true)
   const sides: DoorSide[] = ['N', 'S', 'E', 'W']
   const trimDark = new THREE.Color(st.trimColor).multiplyScalar(0.55)
+  // Forklift bay: everything above/around the door opening goes to the camera-fade batch so the
+  // chase cam can see the forklift drive out (its header has no collider either).
+  const hb = FADE_DOOR_BUILDINGS.has(bi.id) ? ctx.fade : b
 
   // --- walls ---------------------------------------------------------------
-  for (const w of wallBoxes(bi)) b.boxMinMax(wallKey, w.rect.minX, w.y0, w.rect.minZ, w.rect.maxX, w.y1, w.rect.maxZ, st.wallColor)
+  for (const w of wallBoxes(bi)) (w.kind === 'header' ? hb : b).boxMinMax(wallKey, w.rect.minX, w.y0, w.rect.minZ, w.rect.maxX, w.y1, w.rect.maxZ, st.wallColor)
 
   // --- plinth, corners, eave band ----------------------------------------
   for (const s of sides) {
@@ -138,16 +141,16 @@ function addBuilding(ctx: BuildCtx, bi: BuildingInfo): void {
   // --- door ---------------------------------------------------------------
   const of = outer(doorSide)
   const inf = inner(doorSide)
-  fbox(b, 'paint', of, dc, doorH, 0.3, span + 0.56, 0.14, st.trimColor)
+  fbox(hb, 'paint', of, dc, doorH, 0.3, span + 0.56, 0.14, st.trimColor)
   fbox(b, 'hazard', of, d0 - 0.14, 0, doorH, 0.28, 0.14, '#ffffff')
   fbox(b, 'hazard', of, d1 + 0.14, 0, doorH, 0.28, 0.14, '#ffffff')
   if (st.door === 'rollup') {
     // partly lowered curtain (slats) in the opening, drum on the inside
     for (let k = 0; k < 4; k++) {
       const y = doorH - 0.24 - k * 0.235
-      fbox(b, k === 3 ? 'hazard' : 'paint', of, dc, y, 0.2, span, 0.07, k === 3 ? '#ffffff' : '#7E8A8F', -bi.t / 2 - 0.035)
+      fbox(hb, k === 3 ? 'hazard' : 'paint', of, dc, y, 0.2, span, 0.07, k === 3 ? '#ffffff' : '#7E8A8F', -bi.t / 2 - 0.035)
     }
-    fbox(b, 'paint', inf, dc, doorH + 0.02, 0.6, span + 0.5, 0.6, '#5E686C', 0.02)
+    fbox(hb, 'paint', inf, dc, doorH + 0.02, 0.6, span + 0.5, 0.6, '#5E686C', 0.02)
     fbox(b, 'paint', inf, d0 + 0.08, 0, doorH, 0.16, 0.18, DARK, 0.02)
     fbox(b, 'paint', inf, d1 - 0.08, 0, doorH, 0.16, 0.18, DARK, 0.02)
   } else if (st.door === 'glass') {
@@ -231,7 +234,7 @@ function addBuilding(ctx: BuildCtx, bi: BuildingInfo): void {
     if (a1 - a0 < 0.05) continue
     const y0 = w.y0
     const y1 = Math.min(w.y1, H - 0.05)
-    fbox(b, 'brick', fi, (a0 + a1) / 2, y0, y1 - y0, a1 - a0, 0.04, st.liningColor)
+    fbox(w.kind === 'header' ? hb : b, 'brick', fi, (a0 + a1) / 2, y0, y1 - y0, a1 - a0, 0.04, st.liningColor)
     if (w.kind === 'wall') {
       fbox(b, 'paint', fi, (a0 + a1) / 2, 0, 1.15, a1 - a0, 0.05, st.wainscotColor, 0.04)
       fbox(b, 'paint', fi, (a0 + a1) / 2, 1.15, 0.06, a1 - a0, 0.07, DARK, 0.04)
@@ -258,18 +261,18 @@ function addBuilding(ctx: BuildCtx, bi: BuildingInfo): void {
   // --- sign + gooseneck lamps --------------------------------------------
   const ss = buildingSignSpot(bi)
   slots.reserve(doorSide, ss.along - ss.w / 2 - 1.0, ss.along + ss.w / 2 + 1.0, ss.y0 - 0.2, ss.y0 + ss.h + 1.1)
-  fbox(b, 'paint', of, ss.along, ss.y0 - 0.08, ss.h + 0.16, ss.w + 0.18, 0.1, '#1B2020', 0.02)
+  fbox(hb, 'paint', of, ss.along, ss.y0 - 0.08, ss.h + 0.16, ss.w + 0.18, 0.1, '#1B2020', 0.02)
   const cell = atlas.cells[`bldg:${bi.id}`]
-  if (cell) fquad(b, 'sign', of, ss.along, ss.y0 + ss.h / 2, ss.w, ss.h, cell.uv, '#ffffff', 0.125)
+  if (cell) fquad(hb, 'sign', of, ss.along, ss.y0 + ss.h / 2, ss.w, ss.h, cell.uv, '#ffffff', 0.125)
   const nLamps = Math.max(2, Math.round(ss.w / 2.8))
   for (let k = 0; k < nLamps; k++) {
     const a = ss.along - ss.w / 2 + (ss.w * (k + 0.5)) / nLamps
     const yb = ss.y0 + ss.h + 0.5
     const [x0, z0] = fp(of, a, 0.02)
     const [x1, z1] = fp(of, a, 0.55)
-    b.cylBetween('metal', [x0, yb - 0.25, z0], [x1, yb, z1], 0.025, DARK, 5)
-    b.cylBetween('paint', [x1, yb + 0.02, z1], [x1, yb - 0.16, z1], 0.11, DARK, 8)
-    b.box('glow', x1, yb - 0.17, z1, 0.15, 0.02, 0.15, new THREE.Color('#FFE2B0').multiplyScalar(3))
+    hb.cylBetween('metal', [x0, yb - 0.25, z0], [x1, yb, z1], 0.025, DARK, 5)
+    hb.cylBetween('paint', [x1, yb + 0.02, z1], [x1, yb - 0.16, z1], 0.11, DARK, 8)
+    hb.box('glow', x1, yb - 0.17, z1, 0.15, 0.02, 0.15, new THREE.Color('#FFE2B0').multiplyScalar(3))
   }
 
   // --- beacon brackets (bulbs are instanced by <Beacons>) -------------------

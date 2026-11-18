@@ -36,7 +36,14 @@ export const PLAYER = {
 } as const
 
 export const CAMERA = {
+  /** Vertical FOV (degrees) on landscape screens. */
   fov: 55,
+  /** Portrait screens widen the vertical FOV so at least this much shows across (degrees)… */
+  minHorizontalFov: 50,
+  /** …up to this vertical FOV (degrees). */
+  maxPortraitFov: 75,
+  /** Portrait screens aim this much higher (m, at aspect <= 0.5) so the worker sits lower in the frame. */
+  portraitLookLift: 0.5,
   /** Orbit pivot above the feet (m). */
   pivotHeight: 1.6,
   /** Look target above the feet — slightly above the head so the worker sits lower-center. */
@@ -103,6 +110,11 @@ export const FORKLIFT_CAMERA = {
   defaultPitch: 18 * DEG,
   minDistance: 4,
   maxDistance: 12,
+  /**
+   * Max boom inside a building (the walking cap of 4.2 m crams the chase cam
+   * against the overhead guard; vehicle bays are tall and open).
+   */
+  interiorMaxDistance: 6.5,
   /** Auto-trail rate behind the vehicle heading (scaled by speed). */
   trailLambda: 2.4,
   /** Seconds after a manual orbit before auto-trailing resumes. */

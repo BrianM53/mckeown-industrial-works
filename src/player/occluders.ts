@@ -13,7 +13,12 @@ import * as THREE from 'three'
  * While such an object sits between the camera and the worker's head it is
  * hidden, and it reappears once the line of sight has been clear for a moment.
  * Cheap: flagged objects are collected at ~0.5 Hz and only they are raycast,
- * at 10 Hz.
+ * at 10 Hz. The flag is re-checked on every ray pass, so clearing it takes
+ * effect within 0.1 s (anything we hid is shown again at once).
+ *
+ * `skipContaining` (used while following the forklift): an object whose bounds
+ * contain the focus point is the thing we follow (or encloses it) and is never
+ * hidden.
  */
 export const CAMERA_FADE_FLAG = 'cameraFade'
 
@@ -30,6 +35,12 @@ interface Tracked {
 }
 
 const _dir = new THREE.Vector3()
+const _box = new THREE.Box3()
+
+export interface OccluderOptions {
+  /** Never hide an object whose world bounds contain the focus point. */
+  skipContaining?: boolean
+}
 
 export class OccluderFader {
   private tracked = new Map<THREE.Object3D, Tracked>()
@@ -39,7 +50,7 @@ export class OccluderFader {
   private readonly hits: THREE.Intersection[] = []
   private readonly blocked = new Set<THREE.Object3D>()
 
-  update(dt: number, scene: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3): void {
+  update(dt: number, scene: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3, opts?: OccluderOptions): void {
     this.scanT += dt
     if (this.scanT >= SCAN_INTERVAL) {
       this.scanT = 0
@@ -52,6 +63,12 @@ export class OccluderFader {
     this.rayT = 0
 
     this.blocked.clear()
+    // Objects that dropped the flag since the last scan: show them again and forget them now.
+    for (const [obj, t] of this.tracked) {
+      if (obj.userData?.[CAMERA_FADE_FLAG] === true) continue
+      if (t.hiddenByUs) obj.visible = true
+      this.tracked.delete(obj)
+    }
     _dir.subVectors(to, from)
     const dist = _dir.length()
     if (dist > 0.3) {
@@ -67,7 +84,7 @@ export class OccluderFader {
         } catch {
           /* exotic object without raycast support */
         }
-        if (this.hits.length) this.blocked.add(t.obj)
+        if (this.hits.length && !(opts?.skipContaining && containsPoint(t.obj, to))) this.blocked.add(t.obj)
       }
     }
 
@@ -119,5 +136,15 @@ export class OccluderFader {
     let n = 0
     for (const t of this.tracked.values()) if (t.hiddenByUs) n++
     return n
+  }
+}
+
+/** Do the object's current world bounds contain `p`? (only asked for blocking objects) */
+function containsPoint(obj: THREE.Object3D, p: THREE.Vector3): boolean {
+  try {
+    _box.setFromObject(obj)
+    return !_box.isEmpty() && _box.containsPoint(p)
+  } catch {
+    return false
   }
 }

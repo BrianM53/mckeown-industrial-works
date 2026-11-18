@@ -34,6 +34,11 @@ import { propGeometry, propMaterial } from './propGeometry'
  */
 
 const KINDS: PropKind[] = ['box', 'boxSmall', 'crate', 'cone', 'barrel', 'pallet']
+/**
+ * Only the bigger silhouettes cast shadows (perf budget): low cardboard boxes and
+ * flat pallets add a shadow draw call for a contact shadow nobody notices.
+ */
+const CASTS_SHADOW: Record<PropKind, boolean> = { box: false, boxSmall: false, pallet: false, crate: true, barrel: true, cone: true }
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const _q = new THREE.Quaternion()
 const _up = new THREE.Vector3()
@@ -380,7 +385,7 @@ export function BumpableProps({ puffs }: { puffs: PuffPool }) {
   return (
     <group name="vehicles-props">
       {KINDS.map((k) => (
-        <PropKindBodies key={k} kind={k} sys={sys} shadows={shadows} />
+        <PropKindBodies key={k} kind={k} sys={sys} shadows={shadows && CASTS_SHADOW[k]} />
       ))}
     </group>
   )

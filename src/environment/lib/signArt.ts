@@ -753,13 +753,18 @@ export function drawWhiteboard(ctx: Ctx, w: number, h: number): void {
   text(ctx, 'LAUNCH WINDOW: ?', w * 0.66, h * 0.52, { size: h * 0.08, color: '#222', family: FONT_MONO, weight: 600 })
 }
 
+/**
+ * Unlit "STUDIO 1" door plate for the radio booth. (The live ON AIR light belongs to stations-a and
+ * only glows while Code Story is open or a jingle plays, so this plate must never look lit.)
+ */
 export function drawOnAir(ctx: Ctx, w: number, h: number): void {
-  ctx.fillStyle = '#3a0d0b'
+  ctx.fillStyle = '#2a2d30'
   ctx.fillRect(0, 0, w, h)
-  ctx.fillStyle = '#ff3b2f'
-  roundRect(ctx, 10, 10, w - 20, h - 20, 18)
-  ctx.fill()
-  text(ctx, 'ON AIR', w / 2, h / 2 + 2, { size: h * 0.62, color: '#fff3ea', align: 'center', spacing: 10 })
+  ctx.strokeStyle = '#8c9296'
+  ctx.lineWidth = 4
+  roundRect(ctx, 8, 8, w - 16, h - 16, 12)
+  ctx.stroke()
+  text(ctx, 'STUDIO 1', w / 2, h / 2 + 2, { size: h * 0.5, color: '#c9c3b6', align: 'center', spacing: 8 })
 }
 
 // ---------------------------------------------------------------------------

@@ -69,6 +69,13 @@ function SimDriver() {
       return ui.panel !== null || ui.dialogue !== null
     })
     director.setEnabledPredicate(() => !params.noEvents && useSettings.getState().ambientEvents)
+    // Esc with nothing open shows the quick-links menu as a pause menu ("SHIFT BREAK"):
+    // freeze the factory sim while it is open so the pause is real (spec §4: Esc pauses).
+    const syncPause = () => {
+      simClock.paused = useUIStore.getState().panel?.id === 'quicklinks'
+    }
+    syncPause()
+    const offPause = useUIStore.subscribe(syncPause)
     const offDbg = registerDebug('clock', {
       advance: (s: number) => simClock.advance(s),
       setTimeScale: (n: number) => {
@@ -97,6 +104,8 @@ function SimDriver() {
       }),
     })
     return () => {
+      offPause()
+      simClock.paused = false
       factory.stop()
       offSup()
       offDbg()
