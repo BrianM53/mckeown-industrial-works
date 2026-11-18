@@ -38,7 +38,7 @@
   --pf-font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* Offset of anything fixed above the document (the app's top bar in fallback mode). */
   --pf-sticky-top: 0px;
-  /* Height of the sticky section nav (0 when it is not sticky). */
+  /* Height of the sticky section nav (0 when it is not sticky); mirrored by the scroll containers' scroll-padding-top. */
   --pf-nav-h: 0px;
 
   position: relative;
@@ -473,9 +473,15 @@
   display: block;
 }
 
+/*
+ * Where the section nav is sticky, its height is reserved by the scroll container's
+ * scroll-padding-top (standalone.css: html; fallback.css: .pf-fallback). That keeps keyboard
+ * focus from being scrolled in under the nav (WCAG 2.4.11) and also offsets #anchor jumps, so
+ * the targets only add a small gap here.
+ */
 .pf-main,
 .pf-section {
-  scroll-margin-top: calc(var(--pf-sticky-top) + var(--pf-nav-h) + 1rem);
+  scroll-margin-top: calc(var(--pf-sticky-top) + 1rem);
 }
 
 .pf-section {

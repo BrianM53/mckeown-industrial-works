@@ -395,7 +395,8 @@ export const LINES: LineDef[] = [
   { id: 'pipe', name: 'Pipe & Valve Machining', x: -16, zStart: 18, zEnd: 2, width: 4, color: '#B87333', overhead: false },
   { id: 'circuit', name: 'Electronics & Guidance', x: 9, zStart: 18, zEnd: 2, width: 4, color: '#4FC3A1', overhead: false },
   { id: 'tank', name: 'Fuel Tank Fabrication', x: 16, zStart: 18, zEnd: 2, width: 4, color: '#E57D35', overhead: false },
-  { id: 'payload', name: 'Payload Packing & QC', x: 0, zStart: 19, zEnd: -4.5, width: 2, color: '#E9B63F', overhead: true, railHeight: 6.2 },
+  // Overhead monorail runs just west of the aisle centerline so the view up the aisle to the rocket stays clear.
+  { id: 'payload', name: 'Payload Packing & QC', x: -2.55, zStart: 19, zEnd: -4.5, width: 2, color: '#E9B63F', overhead: true, railHeight: 6.2 },
 ]
 
 /** QC scanner arch spanning the main aisle (payload line inspection). Player walks through it. */

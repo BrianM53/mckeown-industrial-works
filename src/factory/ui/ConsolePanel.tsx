@@ -47,6 +47,7 @@ export default function ConsolePanel({ onClose }: PanelComponentProps) {
 
   return (
     <Panel
+      testId="panel-console"
       title="Line Supervisor Console"
       kicker="PRODUCTION SPINE · LINE SUPERVISOR CONSOLE"
       onClose={onClose}
@@ -208,7 +209,7 @@ function Controls() {
         step={speed.step}
         display={`${params.conveyorSpeed.toFixed(1)}×`}
         valueText={`${params.conveyorSpeed.toFixed(1)} times normal speed`}
-        hint={`Every line runs faster. Past ${MODEL.overspeedKnee.toFixed(1)}× (striped zone) defects climb fast.`}
+        hint={`Every line runs faster. Past ${MODEL.overspeedKnee.toFixed(1)}× (striped zone) defects climb, so a little past it is fine if you raise inspection.`}
         scale={[`${speed.min.toFixed(1)}×`, `${MODEL.overspeedKnee.toFixed(1)}×`, `${speed.max.toFixed(1)}×`]}
         zoneStart={knee}
         testId="console-speed"

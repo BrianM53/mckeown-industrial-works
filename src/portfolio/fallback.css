@@ -19,6 +19,13 @@
   scroll-behavior: smooth;
 }
 
+/* Sticky section nav (portfolio.css .pf-nav, --pf-nav-h): keep focus and anchor jumps below it. */
+@media (min-width: 48rem) and (min-height: 34rem) {
+  .pf-fallback {
+    scroll-padding-top: 3.3rem;
+  }
+}
+
 .pf-fallback__main {
   display: block;
   min-height: 100%;

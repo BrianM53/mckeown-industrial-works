@@ -1,7 +1,11 @@
 node_modules
 dist
 dist-test
-test-results
+test-results/*
+!test-results/summary.json
+!test-results/e2e-output.txt
+!test-results/unit-output.txt
+!test-results/e2e-link-audit.json
 playwright-report
 shots
 *.log

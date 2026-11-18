@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CAMERA } from './constants'
 import {
+  doorwayLimit,
   applyZoom,
   ceilingLimit,
   clampDistance,
@@ -153,5 +154,26 @@ describe('portrait framing', () => {
     expect(portraitLookLift(1)).toBe(0)
     expect(portraitLookLift(0.75)).toBeCloseTo(CAMERA.portraitLookLift / 2)
     expect(portraitLookLift(0.45)).toBe(CAMERA.portraitLookLift)
+  })
+})
+
+describe('doorway limit (forklift chase cam)', () => {
+  // the Maintenance Bay door: east wall at x = -7.25, opening z in [25, 33]
+  const doors = [{ axis: 'x' as const, plane: -7.25, min: 25, max: 33 }]
+  const pitch = 0.314
+  const dirWest = { x: -Math.cos(pitch), y: Math.sin(pitch), z: 0 } // boom trailing west (forklift driving east)
+
+  it('caps the boom so the camera passes under the header while the boom crosses the doorway', () => {
+    // forklift just out of the bay: the boom runs back through the door
+    const lim = doorwayLimit(-5, 1.9, 29, dirWest.x, dirWest.y, dirWest.z, 8, doors, 3.4)
+    expect(lim).toBeCloseTo((3.4 - 1.9) / Math.sin(pitch), 5)
+    expect(1.9 + lim * Math.sin(pitch)).toBeLessThanOrEqual(3.4 + 1e-9)
+  })
+
+  it('does nothing when the boom misses the opening or stays on one side of the wall', () => {
+    expect(doorwayLimit(-11, 1.9, 29, dirWest.x, dirWest.y, dirWest.z, 6, doors, 3.4)).toBe(Infinity) // inside, boom away from the door
+    expect(doorwayLimit(4, 1.9, 29, dirWest.x, dirWest.y, dirWest.z, 8, doors, 3.4)).toBe(Infinity) // 11 m out: boom ends before the wall
+    expect(doorwayLimit(-5, 1.9, 40, dirWest.x, dirWest.y, dirWest.z, 8, doors, 3.4)).toBe(Infinity) // through solid wall, not the door
+    expect(doorwayLimit(-5, 1.9, 29, dirWest.x, -0.2, dirWest.z, 8, doors, 3.4)).toBe(Infinity) // boom below the pivot
   })
 })

@@ -50,7 +50,7 @@ export const CAMERA = {
   lookHeight: 1.9,
   /** Optional over-the-shoulder offset to the camera's right (m). 0 = centered framing. */
   shoulder: 0,
-  defaultPitch: 10 * DEG,
+  defaultPitch: 7 * DEG,
   minPitch: -20 * DEG,
   maxPitch: 65 * DEG,
   defaultDistance: 5.5,
@@ -115,6 +115,19 @@ export const FORKLIFT_CAMERA = {
    * against the overhead guard; vehicle bays are tall and open).
    */
   interiorMaxDistance: 6.5,
+  /**
+   * Spring-arm probe radius (m). Larger than on foot: a long boom inside the bay otherwise
+   * parks the camera against the back wall, behind wall-mounted pipes and trays (no colliders).
+   */
+  probeRadius: 0.6,
+  /**
+   * While the boom passes through a building doorway the camera stays below this height (m),
+   * so it slips under the header (the Maintenance Bay's rollup curtain hangs to ~3.75 m)
+   * instead of sitting inside it.
+   */
+  doorMaxY: 3.4,
+  /** …but the doorway cap never pulls the boom shorter than this (steeply pitched views). */
+  doorMinArm: 2.5,
   /** Auto-trail rate behind the vehicle heading (scaled by speed). */
   trailLambda: 2.4,
   /** Seconds after a manual orbit before auto-trailing resumes. */

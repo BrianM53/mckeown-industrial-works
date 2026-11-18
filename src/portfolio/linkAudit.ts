@@ -1,7 +1,7 @@
 import { collectExternalLinks, contactOptions } from '../content/links'
 import { RESUME } from '../content/resume'
 import type { LinkRef } from '../content/types'
-import { CREDIT_LINKS, OG_IMAGE, PORTFOLIO_PATH, isExternalHref, normalizeSiteUrl } from './site'
+import { CREDIT_LINKS, OG_IMAGE, PORTFOLIO_PATH, isExternalHref, normalizeSiteUrl, DEFAULT_SITE_URL } from './site'
 
 /**
  * Pure helpers for scripts/check-links.ts: gather every external URL the site can show,
@@ -23,10 +23,15 @@ export function collectAllLinks(siteUrl: string): AuditLink[] {
   }
   if (RESUME.pdfUrl && isExternalHref(RESUME.pdfUrl)) out.push({ label: 'Résumé PDF', url: RESUME.pdfUrl, verified: RESUME.status === 'approved', where: 'resume.pdfUrl' })
   for (const [key, l] of Object.entries(CREDIT_LINKS)) out.push({ ...l, where: `credits.${key}` })
-  const deployNote = 'This site’s own deployment URL; it resolves once the site is deployed there.'
-  out.push({ label: 'Site root (canonical)', url: site, verified: false, note: deployNote, where: 'site.root' })
-  out.push({ label: 'Static portfolio (canonical)', url: site + PORTFOLIO_PATH, verified: false, note: deployNote, where: 'site.portfolio' })
-  out.push({ label: 'Social card image', url: site + OG_IMAGE.path, verified: false, note: deployNote, where: 'site.ogImage' })
+  // The default GitHub Pages deployment was verified live (smoke + browser boot) on 2026-11-18.
+  // Any other SITE_URL (custom domain, fork) stays flagged until it is deployed and checked.
+  const isLiveDefault = site === normalizeSiteUrl(DEFAULT_SITE_URL)
+  const deployNote = isLiveDefault
+    ? 'This site’s own GitHub Pages deployment (verified live 2026-11-18).'
+    : 'This site’s own deployment URL; it resolves once the site is deployed there.'
+  out.push({ label: 'Site root (canonical)', url: site, verified: isLiveDefault, note: deployNote, where: 'site.root' })
+  out.push({ label: 'Static portfolio (canonical)', url: site + PORTFOLIO_PATH, verified: isLiveDefault, note: deployNote, where: 'site.portfolio' })
+  out.push({ label: 'Social card image', url: site + OG_IMAGE.path, verified: isLiveDefault, note: deployNote, where: 'site.ogImage' })
   return out
 }
 

@@ -1,0 +1,192 @@
+{
+  "generatedAt": "2026-11-18T08:09:49.762Z",
+  "siteUrl": "https://brianm53.github.io/mckeown-industrial-works/",
+  "network": false,
+  "strict": false,
+  "links": [
+    {
+      "label": "GitHub — BrianM53",
+      "url": "https://github.com/BrianM53",
+      "verified": true,
+      "where": "profile.github",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "LinkedIn",
+      "url": "https://www.linkedin.com/in/brian-mckeown-49b225229/",
+      "verified": true,
+      "note": "Published by Brian on his GitHub profile and brianm53.github.io. LinkedIn blocks automated checks (HTTP 999), so confirm it manually.",
+      "where": "profile.linkedin",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "brianm53.github.io",
+      "url": "https://brianm53.github.io/",
+      "verified": true,
+      "note": "Brian's current personal site.",
+      "where": "profile.website",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "GitHub profile",
+      "url": "https://github.com/BrianM53",
+      "verified": true,
+      "where": "projects.githubProfile",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Gaussian-SLAM (live streaming)",
+      "url": "https://github.com/BrianM53/Gaussian-SLAM",
+      "verified": true,
+      "where": "projects.gaussian-slam",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Row-Pergfect 1.0",
+      "url": "https://github.com/BrianM53/Row-Pergfect-1.0",
+      "verified": true,
+      "where": "projects.row-pergfect",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "React POS System",
+      "url": "https://github.com/BrianM53/React-POS-System",
+      "verified": true,
+      "where": "projects.react-pos",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "OS Projects",
+      "url": "https://github.com/BrianM53/OS-Projects",
+      "verified": true,
+      "where": "projects.os-projects",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Y86-64 CPU",
+      "url": "https://github.com/BrianM53/Y86-64-CPU",
+      "verified": true,
+      "where": "projects.y86-cpu",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "tryharmony.ai",
+      "url": "https://www.tryharmony.ai/",
+      "verified": true,
+      "note": "tryharmony.ai redirects to the canonical www.tryharmony.ai.",
+      "where": "harmony.link",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Open episode on codestory.co",
+      "url": "https://www.codestory.co/episodes/s13-bonus-eliminating-paperwork-manual-data-entry-in-manufacturing-with-brian-mckeown-ceo-of-harmony-ai/",
+      "verified": true,
+      "note": "Episode text lists Brian as “Founding Engineer at Harmony AI”. Only the URL slug says “ceo”.",
+      "where": "podcast.link",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Code Story on Apple Podcasts",
+      "url": "https://podcasts.apple.com/podcast/id1466861744",
+      "verified": true,
+      "note": "Show page, not the specific episode.",
+      "where": "podcast.platformLinks[0]",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Code Story on Spotify",
+      "url": "https://open.spotify.com/show/0f5HGQ2EPd63H83gqAifXp",
+      "verified": true,
+      "note": "Show page, not the specific episode.",
+      "where": "podcast.platformLinks[1]",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Barlow typeface",
+      "url": "https://github.com/jpt/barlow",
+      "verified": true,
+      "note": "Font project (credits).",
+      "where": "credits.barlow",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "IBM Plex typeface",
+      "url": "https://github.com/IBM/plex",
+      "verified": true,
+      "note": "Font project (credits).",
+      "where": "credits.plex",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "SIL Open Font License",
+      "url": "https://openfontlicense.org/",
+      "verified": true,
+      "note": "Font license (credits).",
+      "where": "credits.ofl",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Site root (canonical)",
+      "url": "https://brianm53.github.io/mckeown-industrial-works/",
+      "verified": true,
+      "note": "This site’s own GitHub Pages deployment (verified live 2026-11-18).",
+      "where": "site.root",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Static portfolio (canonical)",
+      "url": "https://brianm53.github.io/mckeown-industrial-works/portfolio/",
+      "verified": true,
+      "note": "This site’s own GitHub Pages deployment (verified live 2026-11-18).",
+      "where": "site.portfolio",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    },
+    {
+      "label": "Social card image",
+      "url": "https://brianm53.github.io/mckeown-industrial-works/og-image.png",
+      "verified": true,
+      "note": "This site’s own GitHub Pages deployment (verified live 2026-11-18).",
+      "where": "site.ogImage",
+      "syntax": [],
+      "result": "syntax ok",
+      "level": "ok"
+    }
+  ],
+  "localChecks": []
+}

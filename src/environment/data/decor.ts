@@ -302,7 +302,11 @@ export const DOOR_BOLLARDS: Vec2[] = [
 export const REC_GATE = { x: 30.6, z0: -16.6, z1: -11.4, height: 3.6 }
 
 export const ARCH = { z: 38.5, pillarX: 4.9, pillar: 0.8, height: 6.9, beamY0: 5.3 }
-export const GANTRY = { z: 24.5, legX: 6.3, leg: 0.5, height: 7.0, beamY0: 4.9 }
+/**
+ * Intake gantry. `panelY` is the direction panels' center: they hang 0.5 m below the truss
+ * center so every row stays under the HUD top bar from the spawn camera (16:9, 720p).
+ */
+export const GANTRY = { z: 24.5, legX: 6.3, leg: 0.5, height: 7.0, beamY0: 4.9, panelY: 5.4, panelH: 1.47 }
 export const INCIDENT_BOARD = { x0: -6.05, x1: -3.9, z: 24.45, y0: 2.15, y1: 3.65, postX: -4.05 }
 
 /** Production hall portal columns (x = ±19.3) shared with the avenue pipe racks. */

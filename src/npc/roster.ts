@@ -68,7 +68,7 @@ const PIPE_ROBOT = lineSpot('pipe:robot', { pos: [-14.55, 9.75], yaw: face([-14.
 const CIRCUIT_BOOTH = lineSpot('circuit:booth', { pos: [6.45, 13.8], yaw: EAST })
 const CIRCUIT_TEST = lineSpot('circuit:test', { pos: [6.4, 5.7], yaw: EAST })
 const TANK_GAUGE = lineSpot('tank:gauge', { pos: [17.42, 7.25], yaw: face([17.42, 7.25], [17.55, 6.0]) })
-const QC_SPOT = lineSpot('payload:qc', { pos: [5.2, 10.0], yaw: WEST })
+const QC_SPOT = lineSpot('payload:qc', { pos: [-5.2, 10.0], yaw: EAST })
 /** Spots taken from the production module (debug / report). */
 export const SPOT_SOURCES = { SMELT_FURNACE, SMELT_PRESS, PIPE_LATHE, PIPE_ROBOT, CIRCUIT_BOOTH, CIRCUIT_TEST, TANK_GAUGE, QC_SPOT }
 

@@ -69,11 +69,11 @@ describe('static world build', () => {
     ]
     const report: Record<string, number> = {}
     for (const [name, fn] of steps) {
-      const ctx: BuildCtx = { b: new Batch(TILES), atlas: fakeAtlas, q: QUALITY.medium, spinners: [], steam: [], roofs: new Map(), kits: new Map() }
+      const ctx: BuildCtx = { b: new Batch(TILES), atlas: fakeAtlas, q: QUALITY.medium, spinners: [], steam: [], roofs: new Map(), kits: new Map(), fade: new Batch(TILES) }
       fn(ctx)
       let roofs = 0
       for (const rb of ctx.roofs.values()) roofs += trianglesOf(rb)
-      report[name] = Math.round(trianglesOf(ctx.b) + roofs)
+      report[name] = Math.round(trianglesOf(ctx.b) + trianglesOf(ctx.fade) + roofs)
     }
     if (process.env.ENV_REPORT) console.log(JSON.stringify(report))
     expect(Object.values(report).every((n) => n >= 0)).toBe(true)

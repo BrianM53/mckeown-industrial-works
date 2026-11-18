@@ -50,6 +50,16 @@ function cached<T extends THREE.BufferGeometry>(key: string, make: () => T): T {
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000
 
+/**
+ * Curved-primitive segment multiplier for the tier being built (low tier: fewer radial
+ * segments on every cylinder / torus / sphere / lathe). Set around a synchronous build only.
+ */
+let segScale = 1
+export function setSegmentScale(k: number): void {
+  segScale = Number.isFinite(k) && k > 0 ? Math.min(1, k) : 1
+}
+const sg = (n: number, min: number) => (segScale === 1 ? n : Math.max(min, Math.round(n * segScale)))
+
 export const unitBox = (): THREE.BufferGeometry => cached('box', () => new THREE.BoxGeometry(1, 1, 1))
 export const unitCyl = (segs: number, ratio = 1, open = false): THREE.BufferGeometry =>
   cached(`cyl:${segs}:${r3(ratio)}:${open}`, () => new THREE.CylinderGeometry(ratio, 1, 1, segs, 1, open))
@@ -197,7 +207,7 @@ export class GeoBatch {
     _q.setFromUnitVectors(_up, _dir)
     const ratio = rTop === undefined ? 1 : rTop / r
     _m.compose(_p.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), _q, _s.set(r, len, r))
-    this.add(unitCyl(segs, ratio, open), _m, style)
+    this.add(unitCyl(sg(segs, 5), ratio, open), _m, style)
   }
 
   /** Vertical cylinder from base y0. */
@@ -214,11 +224,13 @@ export class GeoBatch {
   }
 
   sphere(c: V3, r: number, style: Style, w = 12, h = 8, scale: V3 = [1, 1, 1]): void {
-    this.add(unitSphere(w, h), this.compose(c, undefined, [r * scale[0], r * scale[1], r * scale[2]]), style)
+    this.add(unitSphere(sg(w, 6), sg(h, 4)), this.compose(c, undefined, [r * scale[0], r * scale[1], r * scale[2]]), style)
   }
 
   /** Torus whose axis is `axis` (ring lies in the perpendicular plane). arc < 2π for partial rings starting at `startAngle`. */
   torus(c: V3, R: number, tube: number, style: Style, axis: 'x' | 'y' | 'z' = 'z', arc = Math.PI * 2, rs = 8, ts = 24, startAngle = 0): void {
+    rs = sg(rs, 4)
+    ts = sg(ts, 8)
     const geo = cached(`tor:${r3(R)}:${r3(tube)}:${rs}:${ts}:${r3(arc)}`, () => new THREE.TorusGeometry(R, tube, rs, ts, arc))
     // TorusGeometry lies in the XY plane (axis +Z): spin within the plane, then turn the axis.
     if (axis === 'x') _qa.setFromAxisAngle(_Y, Math.PI / 2)
@@ -232,6 +244,7 @@ export class GeoBatch {
 
   /** Surface of revolution around +Y from [radius, y] points (bottom → top). */
   lathe(points: ReadonlyArray<readonly [number, number]>, c: V3, style: Style, segs = 16, rot?: V3, scale: V3 = [1, 1, 1]): void {
+    segs = sg(segs, 6)
     const key = `lathe:${segs}:${points.map((p) => `${r3(p[0])},${r3(p[1])}`).join(';')}`
     const geo = cached(key, () => new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(Math.max(r, 1e-4), y)), segs))
     this.add(geo, this.compose(c, rot, scale), style)

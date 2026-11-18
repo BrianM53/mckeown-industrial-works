@@ -10,6 +10,7 @@ import {
   ceilingLimit,
   clampPitch,
   decayTrauma,
+  doorwayLimit,
   fovForAspect,
   nearestAngle,
   orbitOffset,
@@ -17,6 +18,7 @@ import {
   shakeNoise,
   springArmStep,
   type ArmState,
+  type DoorSlab,
 } from './cameraMath'
 import type { LookInput } from './input'
 
@@ -69,6 +71,28 @@ const _off = { x: 0, y: 0, z: 0 }
 const _ndc = new THREE.Vector3()
 const IDENTITY_ROT = { x: 0, y: 0, z: 0, w: 1 }
 
+let DOORS: DoorSlab[] | null = null
+/** Every building doorway from the layout: the wall's mid-plane and the opening span. */
+function doorSlabs(): DoorSlab[] {
+  if (DOORS) return DOORS
+  const out: DoorSlab[] = []
+  for (const zone of Object.values(ZONES)) {
+    const b = zone.building
+    if (!b) continue
+    const f = b.footprint
+    const i = b.interior
+    const t = Math.max(0.2, Math.min(i.minX - f.minX, f.maxX - i.maxX, i.minZ - f.minZ, f.maxZ - i.maxZ))
+    const min = Math.min(b.doorSpan[0], b.doorSpan[1])
+    const max = Math.max(b.doorSpan[0], b.doorSpan[1])
+    if (b.doorSide === 'E') out.push({ axis: 'x', plane: f.maxX - t / 2, min, max })
+    else if (b.doorSide === 'W') out.push({ axis: 'x', plane: f.minX + t / 2, min, max })
+    else if (b.doorSide === 'N') out.push({ axis: 'z', plane: f.minZ + t / 2, min, max })
+    else out.push({ axis: 'z', plane: f.maxZ - t / 2, min, max })
+  }
+  DOORS = out
+  return out
+}
+
 export class CameraRig {
   /** Smoothed orbit state (what the camera shows). */
   yaw = 0
@@ -99,6 +123,7 @@ export class CameraRig {
   private fov: number = CAMERA.fov
   private ball: RAPIER.Ball | null = null
   private ballRapier: typeof RAPIER | null = null
+  private ballRadius = 0
   /** Smoothed interior/eave boom cap. */
   private cap: number = CAMERA.maxDistance
   private pivotHeight: number = CAMERA.pivotHeight
@@ -247,6 +272,13 @@ export class CameraRig {
     let capTarget = maxD
     if (zoneId) capTarget = Math.min(capTarget, fork ? FORKLIFT_CAMERA.interiorMaxDistance : CAMERA.interiorMaxDistance)
     if (building) capTarget = Math.min(capTarget, ceilingLimit(this.pivot.y, this.pitch, building.height - CAMERA.eaveMargin))
+    if (fork) {
+      // boom through a doorway (driving in or out): keep the chase cam under the header
+      orbitOffset(this.yaw, this.pitch, 1, _off)
+      const reach = this.zoom + FORKLIFT_CAMERA.probeRadius
+      const door = doorwayLimit(this.pivot.x, this.pivot.y, this.pivot.z, _off.x, _off.y, _off.z, reach, doorSlabs(), FORKLIFT_CAMERA.doorMaxY)
+      capTarget = Math.min(capTarget, Math.max(FORKLIFT_CAMERA.doorMinArm, door))
+    }
     capTarget = Math.max(CAMERA.minArm, capTarget)
     this.cap = this.snapNext || !Number.isFinite(this.cap) ? capTarget : damp(this.cap, capTarget, CAMERA.capLambda, dt)
     const desired = Math.max(CAMERA.minArm, Math.min(this.zoom, this.cap))
@@ -318,9 +350,13 @@ export class CameraRig {
     const { world, rapier } = ctx
     if (!world || !rapier) return desired
     try {
-      if (!this.ball || this.ballRapier !== rapier) {
-        this.ball = new rapier.Ball(CAMERA.probeRadius)
+      // The chase cam probes with a fatter ball: it keeps the camera clear of wall-mounted
+      // pipes / trays (no colliders, up to ~0.5 m off a wall) that would otherwise fill the view.
+      const radius = this.follow === 'forklift' ? FORKLIFT_CAMERA.probeRadius : CAMERA.probeRadius
+      if (!this.ball || this.ballRapier !== rapier || this.ballRadius !== radius) {
+        this.ball = new rapier.Ball(radius)
         this.ballRapier = rapier
+        this.ballRadius = radius
       }
       const hit = world.castShape(
         { x: this.pivot.x, y: this.pivot.y, z: this.pivot.z },

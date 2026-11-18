@@ -54,7 +54,7 @@ export const LINE_WORKER_SPOTS: Record<LineId, LineWorkerSpot[]> = {
     { id: 'tank:gauge', position: [17.42, 7.25], yaw: face([17.42, 7.25], [TANK.gauge.x, TANK.gauge.z]), anim: 'point', task: 'Pointing at the pressure gauge' },
   ],
   payload: [
-    { id: 'payload:qc', position: [5.2, ARCH.z - 1.0], yaw: WEST, anim: 'work', task: 'Scanning anyone who walks through the QC arch' },
+    { id: 'payload:qc', position: [-5.2, ARCH.z - 1.0], yaw: EAST, anim: 'work', task: 'Scanning anyone who walks through the QC arch' },
     { id: 'payload:packing', position: [-5.0, 16.95], yaw: NORTH, anim: 'idle', task: 'Counting payload pods' },
   ],
 }

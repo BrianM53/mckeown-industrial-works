@@ -135,7 +135,7 @@ function buildColliders(): ColliderDef[] {
     out.push(box(`struct:gantry-leg:${sx}`, 'structure', { minX: gx - GANTRY.leg / 2, maxX: gx + GANTRY.leg / 2, minZ: GANTRY.z - GANTRY.leg / 2, maxZ: GANTRY.z + GANTRY.leg / 2 }, 0, GANTRY.height))
   }
   out.push(box('struct:arch-beam', 'structure', { minX: -ARCH.pillarX, maxX: ARCH.pillarX, minZ: ARCH.z - 0.35, maxZ: ARCH.z + 0.35 }, ARCH.beamY0, ARCH.height, 'camera'))
-  out.push(box('struct:gantry-beam', 'structure', { minX: -GANTRY.legX, maxX: GANTRY.legX, minZ: GANTRY.z - 0.45, maxZ: GANTRY.z + 0.45 }, GANTRY.beamY0, GANTRY.height, 'camera'))
+  out.push(box('struct:gantry-beam', 'structure', { minX: -GANTRY.legX, maxX: GANTRY.legX, minZ: GANTRY.z - 0.45, maxZ: GANTRY.z + 0.45 }, Math.min(GANTRY.beamY0, GANTRY.panelY - GANTRY.panelH / 2 - 0.05), GANTRY.height, 'camera'))
   out.push(cyl('struct:incident-post', 'structure', INCIDENT_BOARD.postX, INCIDENT_BOARD.z, 0.09, INCIDENT_BOARD.y1))
   out.push(cyl('struct:rec-gate-n', 'structure', REC_GATE.x, REC_GATE.z0, 0.14, REC_GATE.height))
   out.push(cyl('struct:rec-gate-s', 'structure', REC_GATE.x, REC_GATE.z1, 0.14, REC_GATE.height))

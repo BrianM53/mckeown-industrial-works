@@ -10,6 +10,13 @@ interface GameStore {
   status: 'loading' | 'ready' | 'error'
   setStatus: (s: GameStore['status']) => void
 
+  /**
+   * False while modules load and shaders precompile behind the loading screen (the canvas
+   * frame loop is held at 'never' so nothing compiles synchronously mid-frame). writer: Scene
+   */
+  renderEnabled: boolean
+  setRenderEnabled: (v: boolean) => void
+
   /** Module slots loaded / total (drives the loading progress bar). */
   modulesLoaded: number
   modulesTotal: number
@@ -41,6 +48,11 @@ interface GameStore {
 export const useGameStore = create<GameStore>((set, get) => ({
   status: 'loading',
   setStatus: (status) => set({ status }),
+
+  renderEnabled: false,
+  setRenderEnabled: (renderEnabled) => {
+    if (get().renderEnabled !== renderEnabled) set({ renderEnabled })
+  },
 
   modulesLoaded: 0,
   modulesTotal: 0,

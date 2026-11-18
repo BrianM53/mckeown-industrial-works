@@ -58,9 +58,9 @@ export function buildCollector(k: Kit): Animator {
     section(side * C.innerX, C.z + hw, side * C.innerX, C.transferZEnd, -0.03)
     // tower intake mouth at the transfer end
     const mx = side * C.innerX
-    b.rbox([mx, y + 0.2, C.transferZEnd - 0.2], [1.25, 1.3, 0.62], st.paint(COL.charcoal, 0.6, 0.3), 0.05)
-    b.box([mx, y + 0.18, C.transferZEnd + 0.12], [0.98, 0.7, 0.02], st.paint(COL.black, 0.95, 0.05))
-    b.box([mx, y + 0.86, C.transferZEnd + 0.12], [1.25, 0.08, 0.04], trim)
+    b.rbox([mx, y + 0.2, C.transferZEnd - 0.2], [1.05, 1.3, 0.62], st.paint(COL.charcoal, 0.6, 0.3), 0.05)
+    b.box([mx, y + 0.18, C.transferZEnd + 0.12], [0.9, 0.7, 0.02], st.paint(COL.black, 0.95, 0.05))
+    b.box([mx, y + 0.86, C.transferZEnd + 0.12], [1.05, 0.08, 0.04], trim)
     // hangers from the last monorail portal
     const pz = MONORAIL.portalZ[MONORAIL.portalZ.length - 1]
     for (const dx of [-0.38, 0.38]) b.cyl([mx + dx, MONORAIL.portalBeamY0, pz], [mx + dx, y + 0.12, pz], 0.025, st.metal(COL.steel), 5)

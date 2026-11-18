@@ -20,6 +20,13 @@ body > .pf {
   min-height: 100vh;
 }
 
+/* Sticky section nav (portfolio.css .pf-nav, --pf-nav-h): keep focus and anchor jumps below it. */
+@media (min-width: 48rem) and (min-height: 34rem) {
+  html {
+    scroll-padding-top: 3.3rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

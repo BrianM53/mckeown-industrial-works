@@ -201,7 +201,7 @@ export class ItemRenderer {
       const sway = reduced ? 0 : 1
       const roll = sway * 0.035 * Math.sin(t * 1.7 + cycle * 1.3)
       const pitch = sway * 0.03 * Math.sin(t * 1.1 + cycle * 0.7)
-      this.put(kind, 0, MONORAIL.y, zAt(pdef, p), pitch, (hash01(cycle, 77) - 0.5) * 0.5, roll)
+      this.put(kind, MONORAIL.x, MONORAIL.y, zAt(pdef, p), pitch, (hash01(cycle, 77) - 0.5) * 0.5, roll)
       v.pods++
     }
     // ---- rejected pods (falling / in the bin): rotate about the body center

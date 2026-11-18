@@ -34,9 +34,13 @@ export default function ProductionLines() {
   const reduced = useSettings((s) => s.reducedMotion)
   const reducedRef = useRef(reduced)
   reducedRef.current = reduced
-  // Heavy geometry is built once for the tier active at load; later tier
-  // changes (auto-downgrade) only toggle shadows and particle caps.
-  const [buildTier] = useState(() => useGameStore.getState().quality)
+  // Heavy geometry is built for the tier active at load. A later drop to 'low' (the
+  // auto-downgrade on slow devices) rebuilds once with the lighter geometry; other tier
+  // changes only toggle shadows and particle caps (no rebuild hitch).
+  const [buildTier, setBuildTier] = useState(() => useGameStore.getState().quality)
+  useEffect(() => {
+    if (quality === 'low' && buildTier !== 'low') setBuildTier('low')
+  }, [quality, buildTier])
   const world = useMemo(() => buildProduction(buildTier), [buildTier])
 
   useEffect(() => () => world.dispose(), [world])

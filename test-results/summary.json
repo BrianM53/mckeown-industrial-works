@@ -1,0 +1,54 @@
+{
+  "e2e": {
+    "passed": 61,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "durationSec": 864.0,
+    "failures": []
+  },
+  "unit": {
+    "files": 66,
+    "tests": 850,
+    "passed": 850,
+    "failed": 0
+  },
+  "typecheck": {
+    "errors": 0
+  },
+  "date": "2026-11-18",
+  "e2eRuns": [
+    {
+      "run": 1,
+      "passed": 61,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "durationSec": 1001.8
+    },
+    {
+      "run": 2,
+      "passed": 61,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "durationSec": 1028.1
+    },
+    {
+      "run": 3,
+      "passed": 61,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "durationSec": 864.0,
+      "note": "after shader-precompile load gate, auto-quality threshold 28 fps, spawn pitch 7\u00b0"
+    }
+  ],
+  "commands": {
+    "build": "npm run build:test",
+    "e2e": "npx playwright test (projects desktop+mobile, 2 workers, vite preview dist-test :4174)",
+    "unit": "npx vitest run",
+    "typecheck": "npm run typecheck"
+  },
+  "testChanges": "none needed (no failures or flakiness in 2 consecutive full runs); removed stale test-results/e2e-artifacts-lite left over from an earlier iteration"
+}

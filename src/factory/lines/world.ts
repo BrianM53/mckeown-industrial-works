@@ -14,7 +14,7 @@ import type { LineId, QualityTier, SfxName, Vec3 } from '@/core/types'
 import { factory } from '@/systems/factory'
 import { mats } from '@/world/materials'
 import { PLAQUES } from './config'
-import { GeoBatch } from './build/builder'
+import { GeoBatch, setSegmentScale } from './build/builder'
 import { buildCircuit } from './build/circuit'
 import { buildCollector } from './build/collector'
 import { buildConsole, type ConsoleAnimator } from './build/console'
@@ -71,6 +71,16 @@ function plaques(k: Kit): void {
 }
 
 export function buildProduction(tier: QualityTier): ProductionWorld {
+  // low tier: ~40% fewer radial segments on every curved primitive (the build is synchronous)
+  setSegmentScale(tier === 'low' ? 0.6 : 1)
+  try {
+    return buildProductionAt(tier)
+  } finally {
+    setSegmentScale(1)
+  }
+}
+
+function buildProductionAt(tier: QualityTier): ProductionWorld {
   const t0 = typeof performance !== 'undefined' ? performance.now() : 0
   const atlas = createSignAtlas(tier === 'low' ? 0.5 : 1)
   const M: LineMaterials = createMaterials(atlas.texture)
@@ -161,16 +171,13 @@ export function buildProduction(tier: QualityTier): ProductionWorld {
   const puffs = new PuffPool(PARTICLES.high.puffs)
   group.add(sparks.mesh, puffs.mesh)
 
-  // two small warm lights of our own (no shadows): furnace mouth + welding arc
+  // One small warm light of our own (no shadows): the furnace mouth. The welding arc is emissive
+  // + sparks only — the scene-wide budget is ≤ 8 point/spot lights (environment 6, furnace, rocket).
   const furnaceLight = new THREE.PointLight('#ff9a4a', 14, 10, 2)
   furnaceLight.position.set(-6.9, 2.4, 15.35)
   furnaceLight.castShadow = false
   furnaceLight.name = 'lines:furnace-light'
-  const weldLight = new THREE.PointLight('#bfe2ff', 0, 6.5, 2)
-  weldLight.position.set(15.7, 1.9, 12.5)
-  weldLight.castShadow = false
-  weldLight.name = 'lines:weld-light'
-  group.add(furnaceLight, weldLight)
+  group.add(furnaceLight)
 
   kit.belts.bind(M.beltOffsets)
 
@@ -186,7 +193,7 @@ export function buildProduction(tier: QualityTier): ProductionWorld {
     fxChan: M.fxChan,
     emit: live.emit,
     furnaceLight,
-    weldLight,
+    weldLight: null,
     sfx,
   }
   const frame: Frame = { dt: 0, t: 0, s: factory.state, reduced: false, power: 1, fx: effects }
@@ -281,7 +288,6 @@ export function buildProduction(tier: QualityTier): ProductionWorld {
       M.dispose()
       atlas.dispose()
       furnaceLight.dispose()
-      weldLight.dispose()
     },
   }
 }

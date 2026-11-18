@@ -5,7 +5,7 @@
  * with the simulation and the audio module (press thump at phase 0.5).
  */
 import type { LineId } from '@/core/types'
-import { COLLECTOR_CFG, ELEVATOR, BELT, ITEM_STAGES, REJECT, type ItemKind } from './config'
+import { COLLECTOR_CFG, ELEVATOR, BELT, ITEM_STAGES, MONORAIL, REJECT, type ItemKind } from './config'
 
 export const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 
@@ -385,6 +385,7 @@ export class QcArchMonitor {
   private prevZ = Number.NaN
   private lastBeep = -Infinity
   private lastToast = -Infinity
+  private prevSeq = Number.NaN
   readonly result: QcStep = { pass: false, beep: false, toast: false }
 
   constructor(
@@ -393,13 +394,21 @@ export class QcArchMonitor {
     private readonly opts: { beepGap?: number; toastGap?: number; maxStep?: number } = {},
   ) {}
 
-  step(x: number, z: number, onFoot: boolean, now: number): QcStep {
+  /**
+   * `teleportSeq` (runtime.player.teleportSeq, bumped by the player module on every discontinuous
+   * move: fast travel, respawn, debug teleport): a frame whose sequence changed is never a walk.
+   * `maxStep` stays as a sanity bound for callers without a sequence (generous: low-fps frames).
+   */
+  step(x: number, z: number, onFoot: boolean, now: number, teleportSeq?: number): QcStep {
     const r = this.result
     r.pass = r.beep = r.toast = false
     const px = this.prevX
     const pz = this.prevZ
     this.prevX = x
     this.prevZ = z
+    const seqChanged = teleportSeq !== undefined && teleportSeq !== this.prevSeq
+    if (teleportSeq !== undefined) this.prevSeq = teleportSeq
+    if (seqChanged) return r
     if (!onFoot || !Number.isFinite(px) || !Number.isFinite(pz) || !Number.isFinite(x) || !Number.isFinite(z)) return r
     const maxStep = this.opts.maxStep ?? 1.5
     if (Math.abs(z - pz) > maxStep || Math.abs(x - px) > maxStep) return r
@@ -424,6 +433,7 @@ export class QcArchMonitor {
 
   reset(): void {
     this.prevX = this.prevZ = Number.NaN
+    this.prevSeq = Number.NaN
   }
 }
 
@@ -468,8 +478,9 @@ export function rejectPose(t: number, fromY: number, fromZ: number, slot: number
   const [ax, ay, az] = REJECT.chuteA
   const [bx, by, bz] = REJECT.chuteB
   const lift = 0.5 // pod center above the chute surface
+  const x0 = MONORAIL.x
   if (t <= 0) {
-    out.x = 0
+    out.x = x0
     out.y = fromY
     out.z = fromZ
     out.rx = out.rz = 0
@@ -477,7 +488,7 @@ export function rejectPose(t: number, fromY: number, fromZ: number, slot: number
   }
   if (t < T.release) {
     const k = t / T.release
-    out.x = ax * k * k
+    out.x = x0 + (ax - x0) * k * k
     out.y = fromY + (ay + lift - fromY) * k * k
     out.z = fromZ + (az - fromZ) * k
     out.rx = 0

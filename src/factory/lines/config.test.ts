@@ -90,7 +90,8 @@ describe('production colliders keep paths and doors clear', () => {
     expect(ARCH.inner * 2).toBeCloseTo(QC_ARCH.width)
     expect(ARCH.detectHalfW).toBeLessThanOrEqual(ARCH.inner)
     // the reject bin sits beside the aisle, never in it
-    expect(REJECT.bin.minX).toBeGreaterThan(3.5)
+    expect(Math.min(Math.abs(REJECT.bin.minX), Math.abs(REJECT.bin.maxX))).toBeGreaterThan(3.5)
+    expect(Math.sign(REJECT.bin.minX)).toBe(Math.sign(REJECT.bin.maxX))
   })
 
   it('collector supports only at x = ±9 / ±16 near z = 0 (never on walkways or the aisle)', () => {

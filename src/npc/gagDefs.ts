@@ -553,7 +553,7 @@ function heldPosition(a: ArmAngles, out: { x: number; y: number; z: number }) {
 
 const armOutTrack = new Track([
   { t: 6.6, p: ARM_LAND, y: ARM_SINK, a: 'walk' },
-  { t: 7.9, p: ARM_OUT, y: 0, a: 'wave', face: 'hold', yaw: EAST },
+  { t: 7.9, p: ARM_OUT, y: 0, a: 'thumbsup', face: 'hold', yaw: EAST }, // "I'm fine!"
   { t: 9.6, p: ARM_OUT, yaw: EAST },
 ])
 

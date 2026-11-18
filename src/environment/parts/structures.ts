@@ -101,8 +101,8 @@ function addGantry(ctx: BuildCtx): void {
     }
   }
   // direction panels (south face)
-  const py = (GANTRY.beamY0 + 0.15 + H - 0.25) / 2
-  const ph = 1.47
+  const py = GANTRY.panelY
+  const ph = GANTRY.panelH
   GANTRY_PANELS.forEach((p, i) => {
     const x = (i - 1) * 4.18
     b.box('paint', x, py, z + 0.33, 4.1, ph + 0.08, 0.06, DARK)

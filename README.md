@@ -13,6 +13,13 @@ Every real fact on the site (role, résumé, projects, podcast, links) comes fro
 
 ![Spawn view](docs/screenshots/01-spawn.png)
 
+| | | |
+|---|---|---|
+| ![Rocket assembly](docs/screenshots/03-rocket-assembly.png) | ![Launch](docs/screenshots/05-launch-ignition.png) | ![Unscheduled disassembly](docs/screenshots/06-launch-failure.png) |
+| ![Forklift](docs/screenshots/08-forklift.png) | ![Safety inspector tackle](docs/screenshots/09-osha-tackle.png) | ![Résumé panel](docs/screenshots/11-resume-panel.png) |
+
+More screenshots (control room, server hall, rec yard, R&D annex, night shift, mobile, lite mode, static page) are in [`docs/screenshots/`](docs/screenshots/README.md).
+
 ---
 
 ## Quick start
@@ -140,7 +147,8 @@ Each world module is lazy-loaded into an isolated slot with its own error bounda
 
 - Unit and component tests: `npm test` (Vitest). They cover contracts, the factory model and launch FSM, OSHA and Night Shift FSMs, NPC routes, dialogue rules, forklift logic, audio consent, UI panels, accessibility contrast and more.
 - End-to-end: `npm run test:e2e` (Playwright) covers the 18 must-pass checks from the spec (§12), plus mobile, no-WebGL fallback and axe-core scans.
-- Results: [`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md). Performance measurements: [`docs/PERF.md`](docs/PERF.md).
+- Results: [`docs/TEST_RESULTS.md`](docs/TEST_RESULTS.md): typecheck clean, 850 unit tests, 61/61 e2e (two consecutive green runs), live smoke 11/11.
+- Performance: [`docs/PERF.md`](docs/PERF.md) (`node scripts/perf.mjs`). Measured on a weak integrated GPU (Intel UHD via WSL2/D3D12) at 1280×720: 27–51 fps across tiers. Medium tier peaks at ~294 draw calls and ~635k triangles, including the shadow pass. The top bar is interactive within 0.15–2.4 s. Shaders now precompile behind the loading screen instead of stalling the first frames.
 - Known limitations and deferred ideas: [`docs/STATUS.md`](docs/STATUS.md).
 
 ## Credits & licenses

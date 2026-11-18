@@ -150,7 +150,7 @@ function PerfMonitor() {
       const s = useSettings.getState()
       const g = useGameStore.getState()
       if (s.quality === 'auto' && params.quality === null && g.status === 'ready' && document.visibilityState === 'visible') {
-        if (runtime.frame.fps < 34) a.lowFor += 0.5
+        if (runtime.frame.fps < 28) a.lowFor += 0.5
         else a.lowFor = Math.max(0, a.lowFor - 0.5)
         if (a.lowFor >= 4) {
           a.lowFor = 0
@@ -164,6 +164,18 @@ function PerfMonitor() {
 }
 
 /** Marks the world ready once every module slot has resolved and a few frames rendered. */
+/**
+ * Load gate + ready signal.
+ * 1. The canvas frame loop starts at 'never' (game store renderEnabled = false), so nothing is drawn
+ *    — and no shader is compiled synchronously mid-frame — while module slots load.
+ * 2. Once every slot has resolved (or after a safety timeout), precompile every material in the scene
+ *    with `compileAsync` (parallel/off-thread where KHR_parallel_shader_compile exists) while the HTML
+ *    loading screen keeps animating, then enable rendering.
+ * 3. After a few rendered frames, mark the world ready and warm up anything created since.
+ */
+const MODULE_WAIT_MS = 45_000
+const COMPILE_WAIT_MS = 30_000
+
 function ReadySignal() {
   const frames = useRef(0)
   const done = useRef(false)
@@ -177,17 +189,46 @@ function ReadySignal() {
     canvas.addEventListener('webglcontextlost', onLost)
     return () => canvas.removeEventListener('webglcontextlost', onLost)
   }, [gl])
+
+  useEffect(() => {
+    let cancelled = false
+    let opening = false
+    const t0 = performance.now()
+    const ready = () => {
+      const g = useGameStore.getState()
+      return (g.modulesTotal > 0 && g.modulesLoaded >= g.modulesTotal) || performance.now() - t0 > MODULE_WAIT_MS
+    }
+    const open = async () => {
+      if (opening || cancelled) return
+      opening = true
+      try {
+        await Promise.race([gl.compileAsync(scene, camera), new Promise((r) => setTimeout(r, COMPILE_WAIT_MS))])
+      } catch {
+        /* compile errors surface again on first render; never block the world on them */
+      }
+      if (!cancelled) useGameStore.getState().setRenderEnabled(true)
+    }
+    const check = () => {
+      if (ready()) void open()
+    }
+    const unsub = useGameStore.subscribe(check)
+    const timer = window.setInterval(check, 1000)
+    check()
+    return () => {
+      cancelled = true
+      unsub()
+      window.clearInterval(timer)
+    }
+  }, [gl, scene, camera])
+
   useFrame(() => {
     if (done.current) return
     frames.current++
-    const g = useGameStore.getState()
-    const allLoaded = g.modulesTotal > 0 && g.modulesLoaded >= g.modulesTotal
-    if ((allLoaded && frames.current > 3) || frames.current > 600) {
+    if (frames.current > 3) {
       done.current = true
-      g.setStatus('ready')
+      useGameStore.getState().setStatus('ready')
       setDebugFlag('ready', true)
-      // Warm up shader programs for everything currently in the scene (parallel compile where
-      // supported) so first glimpses of machinery don't hitch. Best-effort; failures are harmless.
+      // Objects created after the precompile (lazy effects, quality rebuilds) warm up here.
       try {
         void gl.compileAsync(scene, camera).catch(() => {})
       } catch {

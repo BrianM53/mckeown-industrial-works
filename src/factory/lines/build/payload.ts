@@ -1,7 +1,9 @@
 /**
  * LINE 5 — Payload Packing & QC: an overhead monorail along the main aisle
- * (x = 0, rail underside at 6.2 m) from the packing station (south) into the
- * tower's south face, carried by yellow portal frames and the QC scanner arch.
+ * (x = MONORAIL.x, west of the centerline so the aisle keeps a clear view of the
+ * rocket on the tower axis and of the pad; rail underside at 6.2 m) from the
+ * packing station (south) into the tower's south face, carried by yellow portal
+ * frames and the QC scanner arch.
  *
  * The arch (z = 11) scans pods through its ring and sweeps a light band across
  * the aisle. A caught payload defect (defectFlash > 0) drops a pod down the
@@ -54,16 +56,17 @@ export function buildPayload(k: Kit): PayloadAnimator {
   const yellow = st.paint(COL.hazard, 0.5, 0.25)
   const dark = st.paint(COL.charcoal, 0.55, 0.35)
   const RY = MONORAIL.y
+  const X = MONORAIL.x
 
   // ---------------------------------------------------------------- rail
   const zS = MONORAIL.zSouth
   const zN = MONORAIL.zNorth
   const rl = zS - zN
   const rz = (zS + zN) / 2
-  b.box([0, RY + 0.02, rz], [0.3, 0.04, rl], st.metal(COL.gunmetal, 0.4, 0.7))
-  b.box([0, RY + 0.17, rz], [0.05, 0.27, rl], st.metal(COL.gunmetal, 0.4, 0.7))
-  b.box([0, RY + 0.32, rz], [0.3, 0.04, rl], st.metal(COL.gunmetal, 0.4, 0.7))
-  b.box([0, RY + 0.17, zS + 0.05], [0.34, 0.4, 0.1], yellow)
+  b.box([X, RY + 0.02, rz], [0.3, 0.04, rl], st.metal(COL.gunmetal, 0.4, 0.7))
+  b.box([X, RY + 0.17, rz], [0.05, 0.27, rl], st.metal(COL.gunmetal, 0.4, 0.7))
+  b.box([X, RY + 0.32, rz], [0.3, 0.04, rl], st.metal(COL.gunmetal, 0.4, 0.7))
+  b.box([X, RY + 0.17, zS + 0.05], [0.34, 0.4, 0.1], yellow)
 
   // ---------------------------------------------------------------- portals
   const px = MONORAIL.portalX
@@ -77,13 +80,14 @@ export function buildPayload(k: Kit): PayloadAnimator {
       b.cyl([s * px, ptop - 1.1, z], [s * (px - 1.0), MONORAIL.portalBeamY0, z], 0.06, yellow, 8)
     }
     b.rbox([0, (MONORAIL.portalBeamY0 + ptop) / 2, z], [2 * px + pl, ptop - MONORAIL.portalBeamY0, 0.4], yellow, 0.05)
-    for (const s of [-1, 1]) b.cyl([s * 0.11, RY + 0.34, z], [s * 0.11, MONORAIL.portalBeamY0, z], 0.035, st.metal(COL.steel), 6)
-    b.box([0, RY + 0.36, z], [0.36, 0.04, 0.22], dark)
+    for (const s of [-1, 1]) b.cyl([X + s * 0.11, RY + 0.34, z], [X + s * 0.11, MONORAIL.portalBeamY0, z], 0.035, st.metal(COL.steel), 6)
+    b.box([X, RY + 0.36, z], [0.36, 0.04, 0.22], dark)
   }
-  // line board + plaque on the first portal (south face, clear of the pods)
+  // line board on the first portal (south face, on the side away from the rail and pods)
   const p0 = MONORAIL.portalZ[0]
-  for (const x of [-3.45, -1.25]) b.cyl([x, MONORAIL.portalBeamY0, p0 + 0.2], [x, 6.35, p0 + 0.2], 0.02, st.metal(COL.steel), 4)
-  signBoard(k, b, 'line:payload', [-2.35, 6.3, p0 + 0.24], 2.4, Math.PI)
+  const sx0 = -Math.sign(X) * 2.35
+  for (const x of [sx0 - 1.1, sx0 + 1.1]) b.cyl([x, MONORAIL.portalBeamY0, p0 + 0.2], [x, 6.35, p0 + 0.2], 0.02, st.metal(COL.steel), 4)
+  signBoard(k, b, 'line:payload', [sx0, 6.3, p0 + 0.24], 2.4, Math.PI)
 
   // ---------------------------------------------------------------- QC arch
   const az = ARCH.z
@@ -98,31 +102,41 @@ export function buildPayload(k: Kit): PayloadAnimator {
     for (const dz of [-0.16, 0.16]) b.box([ix, 2.45, az + dz], [0.02, 4.2, 0.05], st.glow('#ffffff', 1.8, CH.ARCH))
     b.box([ix - s * 0.02, 2.45, az], [0.03, 4.3, 0.2], dark)
   }
-  for (const s of [-1, 1]) {
-    const x0 = s * 1.45
-    const x1 = s * (ARCH.legX + ARCH.legW / 2)
-    b.rbox([(x0 + x1) / 2, (ARCH.beamY0 + ARCH.top) / 2, az], [Math.abs(x1 - x0), ARCH.top - ARCH.beamY0, 0.56], dark, 0.05)
-    b.box([(x0 + x1) / 2, ARCH.beamY0 + 0.02, az], [Math.abs(x1 - x0), 0.04, 0.6], yellow)
+  // beam halves meet the scanner ring (which sits on the monorail, west of the centerline)
+  const by = (ARCH.beamY0 + ARCH.top) / 2
+  const ringOut = ARCH.ringR + ARCH.ringTube
+  const ringHalf = Math.sqrt(Math.max(0, ringOut * ringOut - (by - ry) * (by - ry))) - 0.04
+  const legOut = ARCH.legX + ARCH.legW / 2
+  for (const [x0, x1] of [
+    [-legOut, X - ringHalf],
+    [X + ringHalf, legOut],
+  ] as const) {
+    if (x1 - x0 < 0.05) continue
+    b.rbox([(x0 + x1) / 2, by, az], [x1 - x0, ARCH.top - ARCH.beamY0, 0.56], dark, 0.05)
+    b.box([(x0 + x1) / 2, ARCH.beamY0 + 0.02, az], [x1 - x0, 0.04, 0.6], yellow)
   }
-  b.torus([0, ry, az], ARCH.ringR, ARCH.ringTube, dark, 'z', Math.PI * 2, 10, 40)
-  b.torus([0, ry, az + 0.2], ARCH.ringR - 0.15, 0.035, st.glow('#ffffff', 2.0, CH.ARCH), 'z', Math.PI * 2, 6, 40)
-  b.torus([0, ry, az - 0.2], ARCH.ringR - 0.15, 0.035, st.glow('#ffffff', 2.0, CH.ARCH), 'z', Math.PI * 2, 6, 40)
-  b.torus([0, ry, az], ARCH.ringR + 0.05, 0.06, yellow, 'z', Math.PI * 2, 6, 40)
-  // signs: south face (toward visitors walking north) and north face
-  signBoard(k, b, 'arch:qc', [-(1.45 + ARCH.legX) / 2 - 0.1, (ARCH.beamY0 + ARCH.top) / 2, az + 0.29], 2.35, Math.PI)
-  signBoard(k, b, 'arch:rejected', [(1.45 + ARCH.legX) / 2 + 0.1, (ARCH.beamY0 + ARCH.top) / 2, az + 0.29], 2.15, Math.PI, { emis: 1, chan: CH.REJECT })
-  signBoard(k, b, 'arch:qc', [(1.45 + ARCH.legX) / 2 + 0.1, (ARCH.beamY0 + ARCH.top) / 2, az - 0.29], 2.35, 0)
-  signBoard(k, b, 'arch:rejected', [-(1.45 + ARCH.legX) / 2 - 0.1, (ARCH.beamY0 + ARCH.top) / 2, az - 0.29], 2.15, 0, { emis: 1, chan: CH.REJECT })
+  b.torus([X, ry, az], ARCH.ringR, ARCH.ringTube, dark, 'z', Math.PI * 2, 10, 40)
+  b.torus([X, ry, az + 0.2], ARCH.ringR - 0.1, 0.035, st.glow('#ffffff', 2.0, CH.ARCH), 'z', Math.PI * 2, 6, 40)
+  b.torus([X, ry, az - 0.2], ARCH.ringR - 0.1, 0.035, st.glow('#ffffff', 2.0, CH.ARCH), 'z', Math.PI * 2, 6, 40)
+  b.torus([X, ry, az], ARCH.ringR + 0.05, 0.06, yellow, 'z', Math.PI * 2, 6, 40)
+  // signs on the long beam half: QUALITY CONTROL over the walkway, REJECTED lightbox beside it
+  const sq = X + ringHalf + 0.12 + 1.175
+  const sr = sq + 1.175 + 0.1 + 1.075
+  signBoard(k, b, 'arch:qc', [sq, by, az + 0.29], 2.35, Math.PI)
+  signBoard(k, b, 'arch:rejected', [sr, by, az + 0.29], 2.15, Math.PI, { emis: 1, chan: CH.REJECT })
+  signBoard(k, b, 'arch:qc', [sq, by, az - 0.29], 2.35, 0)
+  signBoard(k, b, 'arch:rejected', [sr, by, az - 0.29], 2.15, 0, { emis: 1, chan: CH.REJECT })
   const beacons = [k.lamps.add([-ARCH.legX, ARCH.top, az], [0, 1, 0], 0.13, 0.2), k.lamps.add([ARCH.legX, ARCH.top, az], [0, 1, 0], 0.13, 0.2)]
-  // rotor (scanner heads) inside the ring
-  const rotor = rig.add('qc:rotor', 0, [0, ry, az], 0)
+  // rotor: a spinning scanner collar on the ring's north face (heads stay outside the pod path)
+  const rz0 = az - 0.24
+  const rotor = rig.add('qc:rotor', 0, [X, ry, rz0], 0)
   S.bone(rotor, () => {
-    S.torus([0, ry, az], ARCH.ringR - 0.26, 0.03, st.metal(COL.steel), 'z', Math.PI * 2, 5, 36)
+    S.torus([X, ry, rz0], ARCH.ringR - 0.02, 0.03, st.metal(COL.steel), 'z', Math.PI * 2, 5, 36)
     for (let i = 0; i < 3; i++) {
       const a = (i / 3) * Math.PI * 2
-      const r = ARCH.ringR - 0.27
-      S.rbox([Math.cos(a) * r, ry + Math.sin(a) * r, az], [0.16, 0.16, 0.22], dark, 0.03, [0, 0, a])
-      S.sphere([Math.cos(a) * (r - 0.09), ry + Math.sin(a) * (r - 0.09), az], 0.04, st.glow('#ffffff', 2.4, CH.ARCH), 8, 6)
+      const r = ARCH.ringR - 0.04
+      S.rbox([X + Math.cos(a) * r, ry + Math.sin(a) * r, rz0], [0.13, 0.13, 0.16], dark, 0.03, [0, 0, a])
+      S.sphere([X + Math.cos(a) * (r - 0.08), ry + Math.sin(a) * (r - 0.08), rz0], 0.035, st.glow('#ffffff', 2.4, CH.ARCH), 8, 6)
     }
   })
   // sweeping scan bar + light band (FX shares the bone)
@@ -135,7 +149,7 @@ export function buildPayload(k: Kit): PayloadAnimator {
     k.fx.quad([0, 0.3, az], ARCH.inner * 2, 0.9, 0, { color: '#ffffff', chan: FX.SCAN })
   })
   k.fx.bone(0, () => {
-    k.fx.quad([0, ry, az], ARCH.ringR * 2.1, ARCH.ringR * 2.1, 0, { color: '#ffffff', chan: FX.RINGSCAN })
+    k.fx.quad([X, ry, az], ARCH.ringR * 2.1, ARCH.ringR * 2.1, 0, { color: '#ffffff', chan: FX.RINGSCAN })
   })
 
   // ---------------------------------------------------------------- reject chute + bin
@@ -161,8 +175,10 @@ export function buildPayload(k: Kit): PayloadAnimator {
   k.hazard.frame(cx, cy, cz, yaw, () => {
     for (const s of [-1, 1]) k.hazard.box([s * 0.445, 0.19, 0], [0.012, 0.13, len - 0.12], st.white)
   }, pitch)
-  b.cyl([ARCH.legX - 0.2, 3.1, az0 + 0.15], [(ax0 + bx0) / 2 + 0.3, (ay0 + by0) / 2 - 0.5, (az0 + bz0) / 2], 0.05, dark, 6)
-  b.cyl([ax0 - 0.1, ay0 - 0.35, az0], [0.6, ry - ARCH.ringR - 0.05, az], 0.04, dark, 6)
+  // strut from the arch leg on the chute's side + hanger from the ring
+  const cs = Math.sign(bx0 - ax0) || 1
+  b.cyl([cs * (ARCH.legX - 0.2), 3.1, ARCH.z + ARCH.legW / 2 - 0.05], [(ax0 + bx0) / 2 + cs * 0.3, (ay0 + by0) / 2 - 0.5, (az0 + bz0) / 2], 0.05, dark, 6)
+  b.cyl([ax0 + cs * 0.1, ay0 - 0.35, az0], [X + cs * 0.4, ry - ARCH.ringR - ARCH.ringTube * 0.5, az], 0.04, dark, 6)
   const B = REJECT.bin
   const bxc = (B.minX + B.maxX) / 2
   const bzc = (B.minZ + B.maxZ) / 2
@@ -173,41 +189,46 @@ export function buildPayload(k: Kit): PayloadAnimator {
   for (const sx of [-1, 1]) b.box([bxc + sx * (bw / 2 - 0.03), REJECT.binH / 2, bzc], [0.06, REJECT.binH, bd], red)
   for (const sz of [-1, 1]) b.box([bxc, REJECT.binH / 2, bzc + sz * (bd / 2 - 0.03)], [bw, REJECT.binH, 0.06], red)
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box([bxc + sx * (bw / 2), REJECT.binH / 2 + 0.04, bzc + sz * (bd / 2)], [0.09, REJECT.binH + 0.08, 0.09], dark)
-  signBoard(k, b, 'bin:rejects', [B.minX - 0.035, 0.68, bzc], 1.15, Math.PI / 2)
+  // side sign faces the aisle
+  const binAisleX = Math.abs(B.minX) < Math.abs(B.maxX) ? B.minX - 0.035 : B.maxX + 0.035
+  signBoard(k, b, 'bin:rejects', [binAisleX, 0.68, bzc], 1.15, (Math.sign(binAisleX) * Math.PI) / 2)
   signBoard(k, b, 'bin:rejects', [bxc, 0.68, B.maxZ + 0.035], 1.0, Math.PI)
 
   // ---------------------------------------------------------------- packing station (south end)
   const P = PACKING
   const pzc = (P.z0 + P.z1) / 2
-  b.rbox([0, (P.y0 + P.y1) / 2, pzc], [P.halfW * 2, P.y1 - P.y0, P.z1 - P.z0], yellow, 0.08)
-  b.box([0, P.y0 + 0.04, pzc], [P.halfW * 2 + 0.06, 0.08, P.z1 - P.z0 + 0.06], dark)
-  b.box([0, P.y1 - 0.02, pzc], [P.halfW * 2 + 0.06, 0.06, P.z1 - P.z0 + 0.06], dark)
-  for (const sx of [-1, 1]) b.box([sx * 0.95, ptop + 0.15, (p0 + P.z1) / 2], [0.16, 0.3, P.z1 - p0 + 0.2], yellow)
-  for (const sx of [-1, 1]) b.cyl([sx * 0.95, P.y1 + 0.02, P.z0 + 0.4], [sx * px, ptop - 0.6, p0 + 0.25], 0.05, yellow, 6)
-  signBoard(k, b, 'packing', [0, (P.y0 + P.y1) / 2 + 0.1, P.z1 + 0.04], 2.35, Math.PI)
+  const PX = P.x
+  b.rbox([PX, (P.y0 + P.y1) / 2, pzc], [P.halfW * 2, P.y1 - P.y0, P.z1 - P.z0], yellow, 0.08)
+  b.box([PX, P.y0 + 0.04, pzc], [P.halfW * 2 + 0.06, 0.08, P.z1 - P.z0 + 0.06], dark)
+  b.box([PX, P.y1 - 0.02, pzc], [P.halfW * 2 + 0.06, 0.06, P.z1 - P.z0 + 0.06], dark)
+  for (const sx of [-1, 1]) b.box([PX + sx * 0.95, ptop + 0.15, (p0 + P.z1) / 2], [0.16, 0.3, P.z1 - p0 + 0.2], yellow)
+  for (const sx of [-1, 1]) b.cyl([PX + sx * 0.95, P.y1 + 0.02, P.z0 + 0.4], [PX + sx * 0.95, ptop - 0.2, p0 + 0.25], 0.05, yellow, 6)
+  signBoard(k, b, 'packing', [PX, (P.y0 + P.y1) / 2 + 0.1, P.z1 + 0.04], 2.35, Math.PI)
   // exit hatch (north face) — opens as each pod leaves
-  b.box([0, P.y0 + 0.75, P.z0 - 0.02], [1.1, 1.3, 0.04], st.paint(COL.black, 0.9, 0.1))
-  const hatch = rig.add('pack:hatch', 0, [0, P.y0 + 1.42, P.z0 - 0.06], 0)
+  b.box([PX, P.y0 + 0.75, P.z0 - 0.02], [1.1, 1.3, 0.04], st.paint(COL.black, 0.9, 0.1))
+  const hatch = rig.add('pack:hatch', 0, [PX, P.y0 + 1.42, P.z0 - 0.06], 0)
   S.bone(hatch, () => {
-    S.box([0, P.y0 + 0.77, P.z0 - 0.06], [1.15, 1.32, 0.05], st.paint(COL.safety, 0.55, 0.2))
-    S.box([0, P.y0 + 0.77, P.z0 - 0.09], [0.9, 0.08, 0.02], dark)
+    S.box([PX, P.y0 + 0.77, P.z0 - 0.06], [1.15, 1.32, 0.05], st.paint(COL.safety, 0.55, 0.2))
+    S.box([PX, P.y0 + 0.77, P.z0 - 0.09], [0.9, 0.08, 0.02], dark)
   })
-  const packBeacon = k.lamps.add([P.halfW - 0.25, P.y1 + 0.02, P.z1 - 0.3], [0, 1, 0], 0.11, 0.16)
+  const packBeacon = k.lamps.add([PX + P.halfW - 0.25, P.y1 + 0.02, P.z1 - 0.3], [0, 1, 0], 0.11, 0.16)
   // pod-arrival light curtain lamps along the south face
-  const packLight = k.lamps.add([-P.halfW + 0.25, P.y1 + 0.02, P.z1 - 0.3], [0, 1, 0], 0.11, 0.16)
+  const packLight = k.lamps.add([PX - P.halfW + 0.25, P.y1 + 0.02, P.z1 - 0.3], [0, 1, 0], 0.11, 0.16)
 
   // ---------------------------------------------------------------- tower intake hatch (north end)
   const T = TOWER_HATCH
   const tzc = (T.z0 + T.z1) / 2
-  b.rbox([0, (T.y0 + T.y1) / 2, tzc], [T.halfW * 2, T.y1 - T.y0, T.z1 - T.z0], dark, 0.06)
-  b.box([0, T.y0 + 1.05, T.z1 + 0.01], [1.0, 1.45, 0.03], st.paint(COL.black, 0.95, 0.05))
-  for (let i = 0; i < 5; i++) b.box([-0.4 + i * 0.2, T.y0 + 1.05, T.z1 + 0.025], [0.16, 1.4, 0.01], { color: '#2a2f30', rough: 0.4, metal: 0.1 })
-  signBoard(k, b, 'intake', [0, T.y1 - 0.42, T.z1 + 0.03], 1.4, Math.PI)
-  k.hazard.box([0, T.y0 + 0.05, T.z1 + 0.02], [T.halfW * 2, 0.1, 0.04], st.white)
+  const TX = T.x
+  b.rbox([TX, (T.y0 + T.y1) / 2, tzc], [T.halfW * 2, T.y1 - T.y0, T.z1 - T.z0], dark, 0.06)
+  b.box([TX, T.y0 + 1.05, T.z1 + 0.01], [0.86, 1.45, 0.03], st.paint(COL.black, 0.95, 0.05))
+  for (let i = 0; i < 4; i++) b.box([TX - 0.3 + i * 0.2, T.y0 + 1.05, T.z1 + 0.025], [0.16, 1.4, 0.01], { color: '#2a2f30', rough: 0.4, metal: 0.1 })
+  signBoard(k, b, 'intake', [TX, T.y1 - 0.42, T.z1 + 0.03], 0.95, Math.PI)
+  k.hazard.box([TX, T.y0 + 0.05, T.z1 + 0.02], [T.halfW * 2, 0.1, 0.04], st.white)
 
   // ---------------------------------------------------------------- animation + gameplay
-  // maxStep 2.5 m: tolerant of low-fps frames, still ignores fast travel / respawn jumps
-  const monitor = new QcArchMonitor(ARCH.z, ARCH.detectHalfW, { beepGap: 1.2, toastGap: 60, maxStep: 2.5 })
+  // Teleports are recognised by runtime.player.teleportSeq; maxStep is only a sanity bound
+  // (6 m: a walking/running visitor never moves that far in one frame, even at 2-3 fps).
+  const monitor = new QcArchMonitor(ARCH.z, ARCH.detectHalfW, { beepGap: 1.2, toastGap: 60, maxStep: 6 })
   const falling: Falling[] = []
   const resting: Array<{ slot: number; cycle: number }> = []
   let nextSlot = 0
@@ -256,7 +277,7 @@ export function buildPayload(k: Kit): PayloadAnimator {
       // visitor through the arch (feet crossing z = ARCH.z inside the opening)
       const p = runtime.player.position
       const onFoot = runtime.player.mode === 'foot'
-      const r = monitor.step(p.x, p.z, onFoot, wallT)
+      const r = monitor.step(p.x, p.z, onFoot, wallT, runtime.player.teleportSeq)
       if (r.pass) {
         visitorPass(wallT, r.toast)
         if (r.beep) fx.sfx('scanner-beep', beep)

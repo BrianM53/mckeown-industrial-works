@@ -64,8 +64,14 @@ describe('collectAllLinks', () => {
     expect(bad).toEqual([])
   })
 
-  it('deployment URLs are flagged as unverified with an explanation for the owner', () => {
-    for (const l of links.filter((x) => x.where.startsWith('site.'))) {
+  it('the live default deployment URLs are verified; any other SITE_URL stays flagged for the owner', () => {
+    const live = collectAllLinks(DEFAULT_SITE_URL).filter((x) => x.where.startsWith('site.'))
+    expect(live.length).toBe(3)
+    for (const l of live) {
+      expect(l.verified).toBe(true)
+      expect(l.note).toBeTruthy()
+    }
+    for (const l of collectAllLinks('https://portfolio.example.com/').filter((x) => x.where.startsWith('site.'))) {
       expect(l.verified).toBe(false)
       expect(l.note).toBeTruthy()
     }

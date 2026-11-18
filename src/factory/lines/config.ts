@@ -88,6 +88,13 @@ export const COLLECTOR_CFG = {
 const PAYLOAD = lineDef('payload')
 
 export const MONORAIL = {
+  /**
+   * Rail axis. Offset WEST of the aisle centerline (layout LINES.payload x = 0) so the hanging
+   * pods, scanner ring and tower intake never sit between the main aisle and the rocket on the
+   * tower axis (x = 0), nor in the aisle→launch-pad sightline (which runs north-east).
+   * Pods (Ø0.84) clear the west transfer belt (|x| ≤ 1.95) and the arch legs (|x| ≥ 3.8).
+   */
+  x: -2.55,
   /** Underside of the rail (trolleys hang from here). */
   y: PAYLOAD.railHeight ?? 6.2,
   depth: 0.34,
@@ -112,26 +119,28 @@ export const ARCH = {
   legX: QC_ARCH.width / 2 + 0.25,
   top: QC_ARCH.height,
   beamY0: 4.72,
-  ringR: 1.36,
-  ringTube: 0.2,
-  ringY: 5.45,
+  /** Scanner ring around the monorail (centered on MONORAIL.x): encloses the pods and the rail. */
+  ringR: 1.1,
+  ringTube: 0.12,
+  ringY: 5.6,
   /** Player detection half-width (|x| < 3.6 when crossing z). */
   detectHalfW: 3.6,
 } as const
 
 export const REJECT = {
-  bin: { minX: 4.4, maxX: 5.8, minZ: 11.85, maxZ: 13.35 } as Rect,
+  /** West of the aisle, under the monorail side of the arch (keeps the east half of the arch open toward the pad). */
+  bin: { minX: -5.8, maxX: -4.4, minZ: 11.85, maxZ: 13.35 } as Rect,
   binH: 1.2,
   /** Chute: from under the ring to above the bin. */
-  chuteA: [0.95, 4.3, 11.25] as const,
-  chuteB: [4.05, 2.45, 12.35] as const,
+  chuteA: [-2.75, 4.25, 11.5] as const,
+  chuteB: [-4.15, 2.45, 12.45] as const,
   /** Where a rejected pod comes to rest (first slot); later ones stack beside it. */
-  rest: [5.1, 0.42, 12.6] as const,
+  rest: [-5.1, 0.42, 12.6] as const,
   maxInBin: 4,
 } as const
 
-export const PACKING = { z0: 18.65, z1: 20.4, y0: 5.15, y1: 7.42, halfW: 1.3 } as const
-export const TOWER_HATCH = { z0: -4.62, z1: -3.55, y0: 4.3, y1: 7.2, halfW: 1.05 } as const
+export const PACKING = { x: MONORAIL.x, z0: 18.65, z1: 20.4, y0: 5.15, y1: 7.42, halfW: 1.3 } as const
+export const TOWER_HATCH = { x: MONORAIL.x, z0: -4.62, z1: -3.55, y0: 4.3, y1: 7.2, halfW: 0.5 } as const
 
 // ---------------------------------------------------------------------------
 // Line Supervisor Console (desk faces west toward the main aisle)
@@ -379,8 +388,8 @@ function centerColliders(): ColliderSpec[] {
   out.push(box('collector:east', COLLECTOR_CFG.innerX - hw, COLLECTOR_CFG.outerX, -hw, hw, cy0, cy1, 'camera'))
   for (const s of [-1, 1])
     out.push(box(`collector:transfer:${s}`, s * COLLECTOR_CFG.innerX - hw, s * COLLECTOR_CFG.innerX + hw, COLLECTOR_CFG.transferZEnd - 0.35, -hw, cy0, cy1, 'camera'))
-  out.push(box('packing', -PACKING.halfW, PACKING.halfW, PACKING.z0, PACKING.z1, PACKING.y0, PACKING.y1, 'camera'))
-  out.push(box('tower-hatch', -TOWER_HATCH.halfW, TOWER_HATCH.halfW, TOWER_HATCH.z0, TOWER_HATCH.z1, TOWER_HATCH.y0, TOWER_HATCH.y1, 'camera'))
+  out.push(box('packing', PACKING.x - PACKING.halfW, PACKING.x + PACKING.halfW, PACKING.z0, PACKING.z1, PACKING.y0, PACKING.y1, 'camera'))
+  out.push(box('tower-hatch', TOWER_HATCH.x - TOWER_HATCH.halfW, TOWER_HATCH.x + TOWER_HATCH.halfW, TOWER_HATCH.z0, TOWER_HATCH.z1, TOWER_HATCH.y0, TOWER_HATCH.y1, 'camera'))
   // plaque posts
   for (const [id, p] of Object.entries(PLAQUES)) if (p.post) out.push(cyl(`plaque:${id}`, p.x, p.z, 0.09, 0, 1.75))
   return out

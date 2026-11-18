@@ -819,6 +819,25 @@ export class PlayerSystem {
           workerOpacity: round(this.workerOpacity),
         }
       },
+      /** What the camera sees at screen point (NDC x, y; default the centre): nearest hits with their named ancestors. */
+      pick: (x = 0, y = 0, n = 4) => {
+        const sc = this.scene
+        if (!sc) return null
+        const ray = new THREE.Raycaster()
+        ray.setFromCamera(new THREE.Vector2(x, y), getCamera())
+        return ray
+          .intersectObject(sc, true)
+          .filter((h) => {
+            for (let o: THREE.Object3D | null = h.object; o; o = o.parent) if (!o.visible) return false
+            return true
+          })
+          .slice(0, n)
+          .map((h) => {
+            const names: string[] = []
+            for (let o: THREE.Object3D | null = h.object; o && names.length < 6; o = o.parent) if (o.name) names.push(o.name)
+            return { d: round(h.distance), point: [round(h.point.x), round(h.point.y), round(h.point.z)], path: names.join(' < ') }
+          })
+      },
       set: (opts: { yaw?: number; pitch?: number; distance?: number; immediate?: boolean }) => this.rig.set(opts ?? {}),
       recenter: () => this.rig.recenter(),
       follow: (t: FollowTarget) => this.cameraService().follow(t),

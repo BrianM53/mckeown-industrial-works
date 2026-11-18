@@ -12,7 +12,7 @@ import { Bubble, buildBubbleAtlas, useBubbleController, type BubbleAtlas } from 
 import { buildAtlas, fitText, grime, makeCanvasTexture } from '../shared/canvas'
 import { StaticColliders } from '../shared/colliders'
 import { FONT_DISPLAY, FONT_MONO } from '../shared/fonts'
-import { useQuality, useReducedMotion } from '../shared/hooks'
+import { useDistanceGate, useQuality, useReducedMotion } from '../shared/hooks'
 import { recColliders } from './colliders'
 import { BLEACHERS, RULES_INTERACT, SPECTATORS } from './layout'
 import { ARGUE_PHRASES, DISPUTE_PHRASES, RETURN_PHRASES } from './opponent'
@@ -284,9 +284,14 @@ function RulesInteract() {
   return null
 }
 
+/** Beyond this camera distance from the yard center the yard is hidden behind the factory hall / tower. */
+const REC_SEE_RANGE = 52
+
 export function RecYard() {
   const quality = useQuality()
   const reduced = useReducedMotion()
+  const visuals = useRef<THREE.Group>(null)
+  useDistanceGate(visuals, { x: ZONES.rec.center[0], z: ZONES.rec.center[1] }, REC_SEE_RANGE)
   const built = useMemo(() => {
     const signs = buildSigns()
     const geos = buildYard({ uv: signs.uv })
@@ -306,11 +311,15 @@ export function RecYard() {
   const shadows = quality !== 'low'
   return (
     <group name="stations-b:rec-yard">
-      <BatchMeshes geos={built.geos} shadows={shadows} materials={built.mats} noShadowKeys={['turf', 'court', 'line', 'chain', 'net']} name="rec" />
-      <Scoreboard />
-      <Soccer atlas={built.bubbles} reduced={reduced} />
-      <Volleyball atlas={built.bubbles} reduced={reduced} />
-      {quality !== 'low' && <Spectators atlas={built.bubbles} reduced={reduced} />}
+      {/* visuals only: hidden while the camera is far away (e.g. the spawn and the production aisle,
+          where the yard is behind the factory hall); physics, colliders and prompts stay live */}
+      <group ref={visuals} name="stations-b:rec-visuals">
+        <BatchMeshes geos={built.geos} shadows={shadows} materials={built.mats} noShadowKeys={['turf', 'court', 'line', 'chain', 'net']} name="rec" />
+        <Scoreboard />
+        <Soccer atlas={built.bubbles} reduced={reduced} />
+        <Volleyball atlas={built.bubbles} reduced={reduced} />
+        {quality !== 'low' && <Spectators atlas={built.bubbles} reduced={reduced} />}
+      </group>
       <StaticColliders defs={colliders} name="stations-b:rec-colliders" />
       <RulesInteract />
     </group>

@@ -257,6 +257,19 @@ describe('QC scanner arch', () => {
     expect(n.step(0, 10.6, true, 0.1).pass).toBe(false)
   })
 
+  it('uses the player teleport sequence: a short hop across the plane is not a walk, a slow-fps stride is', () => {
+    const m = new QcArchMonitor(11, 3.6, { beepGap: 1.2, toastGap: 60, maxStep: 6 })
+    m.step(0.4, 11.4, true, 0, 3)
+    expect(m.step(0.4, 10.8, true, 0.1, 4).pass).toBe(false) // 0.6 m debug teleport (seq bumped)
+    expect(m.step(0.4, 11.6, true, 0.2, 4).pass).toBe(true) // walking back over the plane
+    const slow = new QcArchMonitor(11, 3.6, { beepGap: 1.2, toastGap: 60, maxStep: 6 })
+    slow.step(1, 13, true, 0, 7)
+    expect(slow.step(1, 9.6, true, 0.5, 7).pass).toBe(true) // 3.4 m in one 2 fps frame, same seq
+    slow.reset()
+    slow.step(1, 13, true, 1, 7)
+    expect(slow.step(1, 9, true, 1.1, 8).pass).toBe(false) // respawn
+  })
+
   it('toast at most once per 60 s, beeps rate limited', () => {
     const m = mk()
     let toasts = 0

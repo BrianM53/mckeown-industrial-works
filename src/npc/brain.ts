@@ -368,9 +368,14 @@ export class NpcBrain {
         this.anim = seated ? 'sit' : 'cheer'
         break
       case 'dismay':
-        // slumped shoulders and a slow head shake ("…that was our rocket")
-        this.anim = seated ? 'sit' : 'idle'
-        this.lookYaw = Math.sin(this.time * 7.5 + this.c.def.seed) * 0.42
+        // slumped shoulders: half the crew facepalms, the rest shake their heads ("…that was our rocket")
+        if (!seated && (this.c.def.seed >> 1) % 2 === 0) {
+          this.anim = 'facepalm'
+          this.lookYaw = null
+        } else {
+          this.anim = seated ? 'sit' : 'idle'
+          this.lookYaw = Math.sin(this.time * 7.5 + this.c.def.seed) * 0.42
+        }
         break
       case 'watch':
         this.anim = seated ? 'sit' : this.carry ? 'carry' : 'idle'

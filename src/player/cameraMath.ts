@@ -146,3 +146,48 @@ export function portraitLookLift(aspect: number, max: number = CAMERA.portraitLo
   if (!Number.isFinite(aspect) || aspect <= 0 || aspect >= 1) return 0
   return max * clamp((1 - aspect) / 0.5, 0, 1)
 }
+
+/** A doorway in a building wall: the wall's mid-plane and the opening's span along it. */
+export interface DoorSlab {
+  /** 'x': the wall is a plane x = `plane` (E/W walls); 'z': a plane z = `plane` (N/S walls). */
+  axis: 'x' | 'z'
+  plane: number
+  /** Opening span along the wall (z range for 'x' walls, x range for 'z' walls). */
+  min: number
+  max: number
+}
+
+/**
+ * Longest boom (m) that keeps the camera below `maxY` while the boom passes through a doorway
+ * (Infinity when the first `length` metres of the boom cross no door). The boom starts at the
+ * pivot (px, py, pz) and runs along the unit vector (dx, dy, dz). With the camera kept low the
+ * chase cam slips under a door header / half-lowered curtain instead of through it; when even
+ * that is impossible it stops short on the pivot's side of the wall.
+ */
+export function doorwayLimit(
+  px: number,
+  py: number,
+  pz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  length: number,
+  doors: readonly DoorSlab[],
+  maxY: number,
+): number {
+  if (!(dy > 1e-4) || !(length > 0)) return Infinity // level or descending boom: never above the pivot
+  let crosses = false
+  for (const d of doors) {
+    const o = d.axis === 'x' ? px : pz
+    const v = d.axis === 'x' ? dx : dz
+    if (Math.abs(v) < 1e-6) continue
+    const s = (d.plane - o) / v
+    if (!(s > 0 && s < length)) continue
+    const along = d.axis === 'x' ? pz + dz * s : px + dx * s
+    if (along >= d.min && along <= d.max) {
+      crosses = true
+      break
+    }
+  }
+  return crosses ? Math.max(0, (maxY - py) / dy) : Infinity
+}

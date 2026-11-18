@@ -1,0 +1,194 @@
+
+> mckeown-industrial-works@1.0.0 test:e2e
+> npm run build:test && playwright test
+
+
+> mckeown-industrial-works@1.0.0 build:test
+> cross-env VITE_TEST_HOOKS=true OUT_DIR=dist-test vite build && cross-env OUT_DIR=dist-test tsx scripts/prerender.tsx
+
+vite v7.3.8 building client environment for production...
+transforming...
+✓ 934 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-test/index.html                                                        3.81 kB │ gzip:   1.41 kB
+dist-test/assets/ibm-plex-mono-vietnamese-400-normal-DDuiU_S-.woff          5.62 kB
+dist-test/assets/ibm-plex-mono-vietnamese-600-normal-iLQfcSjf.woff          5.71 kB
+dist-test/assets/ibm-plex-mono-cyrillic-ext-600-normal-9HEixskS.woff        5.79 kB
+dist-test/assets/ibm-plex-mono-cyrillic-ext-400-normal-DMdlQ8Kv.woff        5.82 kB
+dist-test/assets/ibm-plex-mono-vietnamese-400-normal-BulugwFq.woff2         5.87 kB
+dist-test/assets/barlow-condensed-vietnamese-600-normal-CNlPk46_.woff       6.08 kB
+dist-test/assets/barlow-vietnamese-400-normal-BFeobeCK.woff                 6.09 kB
+dist-test/assets/barlow-condensed-vietnamese-700-normal-DhIzd8Tb.woff       6.10 kB
+dist-test/assets/barlow-vietnamese-600-normal-CA_GiK2e.woff                 6.23 kB
+dist-test/assets/ibm-plex-mono-cyrillic-ext-400-normal-xuaO2J-f.woff2       6.91 kB
+dist-test/assets/ibm-plex-mono-vietnamese-600-normal-D2EvbN8M.woff2         6.93 kB
+dist-test/assets/ibm-plex-mono-cyrillic-400-normal-CEL4l2ZJ.woff            7.20 kB
+dist-test/assets/ibm-plex-mono-cyrillic-600-normal-fLZuRloM.woff            7.27 kB
+dist-test/assets/barlow-vietnamese-400-normal-Dpl4UHAZ.woff2                7.59 kB
+dist-test/assets/barlow-condensed-vietnamese-700-normal-DYeBwlKR.woff2      7.64 kB
+dist-test/assets/ibm-plex-mono-cyrillic-ext-600-normal-V-xxqcpd.woff2       7.69 kB
+dist-test/assets/barlow-condensed-vietnamese-600-normal-A5AYRdjN.woff2      7.70 kB
+dist-test/assets/barlow-vietnamese-600-normal-DcjprdFV.woff2                7.90 kB
+dist-test/assets/ibm-plex-mono-cyrillic-400-normal-BSMlKf0J.woff2           8.36 kB
+dist-test/assets/ibm-plex-mono-cyrillic-600-normal-CTOM6hUh.woff2           9.35 kB
+dist-test/assets/ibm-plex-mono-latin-ext-400-normal-D3D2R8hC.woff          11.77 kB
+dist-test/assets/ibm-plex-mono-latin-ext-600-normal-DmB0ttJJ.woff          11.83 kB
+dist-test/assets/barlow-condensed-latin-ext-600-normal-Clv9cIcR.woff       11.97 kB
+dist-test/assets/barlow-condensed-latin-ext-700-normal-BIHFfxf0.woff       11.99 kB
+dist-test/assets/barlow-latin-ext-400-normal-CvBsJvxq.woff                 12.31 kB
+dist-test/assets/barlow-latin-ext-600-normal-DMVRjfRT.woff                 12.60 kB
+dist-test/assets/ibm-plex-mono-latin-400-normal-CvHOgSBP.woff              13.14 kB
+dist-test/assets/ibm-plex-mono-latin-600-normal-DWFSQ4vo.woff              13.21 kB
+dist-test/assets/ibm-plex-mono-latin-ext-400-normal-BmRBH3aV.woff2         13.35 kB
+dist-test/assets/barlow-latin-ext-400-normal-HxX4XjxC.woff2                14.27 kB
+dist-test/assets/ibm-plex-mono-latin-ext-600-normal-D38SheWl.woff2         14.33 kB
+dist-test/assets/barlow-condensed-latin-ext-600-normal-18ESti3H.woff2      14.52 kB
+dist-test/assets/barlow-condensed-latin-ext-700-normal-CwuXbfVR.woff2      14.64 kB
+dist-test/assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2             14.71 kB
+dist-test/assets/barlow-latin-ext-600-normal-B8NK_A3D.woff2                14.97 kB
+dist-test/assets/ibm-plex-mono-latin-600-normal-BgSNZQsw.woff2             15.62 kB
+dist-test/assets/barlow-condensed-latin-700-normal-Dmwat-ge.woff           18.82 kB
+dist-test/assets/barlow-condensed-latin-600-normal-BFJEwTuo.woff           18.89 kB
+dist-test/assets/barlow-latin-400-normal-fsAxiSwU.woff                     19.58 kB
+dist-test/assets/barlow-latin-600-normal-CNwfPWQD.woff                     19.88 kB
+dist-test/assets/barlow-latin-400-normal-qiz4-Cze.woff2                    22.20 kB
+dist-test/assets/barlow-condensed-latin-600-normal-DepVgxBB.woff2          22.31 kB
+dist-test/assets/barlow-condensed-latin-700-normal-v1xN8_Wq.woff2          22.44 kB
+dist-test/assets/barlow-latin-600-normal-DILqtrty.woff2                    22.77 kB
+dist-test/assets/ConsolePanel-QoPYCkY3.css                                 15.56 kB │ gzip:   3.84 kB
+dist-test/assets/FallbackPortfolio-q69IlDYg.css                            21.80 kB │ gzip:   5.30 kB
+dist-test/assets/index-Cym1BI-h.css                                        73.72 kB │ gzip:  14.61 kB
+dist-test/assets/services-Booioo9L.js                                       0.12 kB │ gzip:   0.11 kB
+dist-test/assets/links-DNdpznkx.js                                          0.30 kB │ gzip:   0.22 kB
+dist-test/assets/usePoll-bLQ3Sd8z.js                                        0.51 kB │ gzip:   0.33 kB
+dist-test/assets/math-Dt4zCQsM.js                                           0.77 kB │ gzip:   0.38 kB
+dist-test/assets/palette-DPCanSqI.js                                        0.91 kB │ gzip:   0.58 kB
+dist-test/assets/HarmonyPanel-BLX-4uuC.js                                   1.12 kB │ gzip:   0.59 kB
+dist-test/assets/common-hZAcF_67.js                                         1.14 kB │ gzip:   0.59 kB
+dist-test/assets/nav-Bgw8-WOF.js                                            1.19 kB │ gzip:   0.65 kB
+dist-test/assets/RndPanel-B1HeFAYJ.js                                       1.24 kB │ gzip:   0.61 kB
+dist-test/assets/CodeStoryPanel-BGN5UOSw.js                                 1.26 kB │ gzip:   0.62 kB
+dist-test/assets/ContactPanel-BjdNtyEh.js                                   1.36 kB │ gzip:   0.65 kB
+dist-test/assets/ProjectPanel-B5_XqpCT.js                                   1.37 kB │ gzip:   0.69 kB
+dist-test/assets/AchievementsPanel-1oRJzlj8.js                              1.46 kB │ gzip:   0.65 kB
+dist-test/assets/resume-CSm-cbuD.js                                         1.48 kB │ gzip:   0.82 kB
+dist-test/assets/Binding-CI3th-ue.js                                        1.60 kB │ gzip:   0.74 kB
+dist-test/assets/api-CziVOqX3.js                                            1.66 kB │ gzip:   0.66 kB
+dist-test/assets/constants-DRkLDkWT.js                                      1.70 kB │ gzip:   0.94 kB
+dist-test/assets/RoundedBoxGeometry-B5E5WzmG.js                             1.72 kB │ gzip:   0.81 kB
+dist-test/assets/RecPanel-Bu_st2Ny.js                                       1.75 kB │ gzip:   0.80 kB
+dist-test/assets/GithubPanel-DxzgwokA.js                                    2.04 kB │ gzip:   0.82 kB
+dist-test/assets/AboutPanel-BtE2-c0r.js                                     2.41 kB │ gzip:   1.18 kB
+dist-test/assets/projects-C4j7ZPs-.js                                       2.98 kB │ gzip:   1.37 kB
+dist-test/assets/ResumePanel-C75Ayv4P.js                                    2.99 kB │ gzip:   1.12 kB
+dist-test/assets/HelpPanel-DRC3ILlP.js                                      3.11 kB │ gzip:   1.17 kB
+dist-test/assets/QuickLinksPanel-CXw7SJHX.js                                3.43 kB │ gzip:   1.31 kB
+dist-test/assets/measure-BCut0nyg.js                                        4.14 kB │ gzip:   1.90 kB
+dist-test/assets/BufferGeometryUtils-D3G6Es0w.js                            4.32 kB │ gzip:   1.19 kB
+dist-test/assets/TouchControls-Bjyz8mLo.js                                  5.44 kB │ gzip:   2.06 kB
+dist-test/assets/SettingsPanel-BcF33w8b.js                                  6.45 kB │ gzip:   2.25 kB
+dist-test/assets/spots-DiTSxSJg.js                                          7.95 kB │ gzip:   3.47 kB
+dist-test/assets/Hud-BePdvR2Q.js                                            9.73 kB │ gzip:   3.44 kB
+dist-test/assets/DirectoryPanel-BTy6GLLs.js                                 9.98 kB │ gzip:   3.91 kB
+dist-test/assets/materials-C3u8mjf9.js                                     10.23 kB │ gzip:   3.40 kB
+dist-test/assets/ConsolePanel-BeTXjJs7.js                                  12.35 kB │ gzip:   4.10 kB
+dist-test/assets/WorkerModel-C_aSkaWv.js                                   17.82 kB │ gzip:   7.03 kB
+dist-test/assets/FallbackPortfolio-C3GGt6z3.js                             22.92 kB │ gzip:   7.47 kB
+dist-test/assets/index-CfHJC5Ev.js                                         23.55 kB │ gzip:   8.48 kB
+dist-test/assets/safety-CqTNhsHy.js                                        54.90 kB │ gzip:  20.32 kB
+dist-test/assets/player-DwnAyACv.js                                        55.97 kB │ gzip:  19.29 kB
+dist-test/assets/vehicles-CVs8-xU-.js                                      71.73 kB │ gzip:  26.17 kB
+dist-test/assets/scene-Da7lDlV-.js                                         84.28 kB │ gzip:  28.53 kB
+dist-test/assets/lines-DB-RNbJp.js                                        105.67 kB │ gzip:  40.28 kB
+dist-test/assets/groupA-C6ouEOOR.js                                       113.78 kB │ gzip:  41.82 kB
+dist-test/assets/rocket-CfUN-s2v.js                                       121.94 kB │ gzip:  45.94 kB
+dist-test/assets/groupB-Ch_drTrv.js                                       131.95 kB │ gzip:  48.85 kB
+dist-test/assets/environment-CNyH0sKY.js                                  176.65 kB │ gzip:  64.59 kB
+dist-test/assets/npc-Izzp76Mx.js                                          221.84 kB │ gzip:  81.14 kB
+dist-test/assets/index-CckPaZpa.js                                        281.40 kB │ gzip:  89.70 kB
+dist-test/assets/runtime-Cxx31Yp5.js                                      753.16 kB │ gzip: 193.11 kB
+dist-test/assets/GameCanvas-Ljxiujj9.js                                 2,451.76 kB │ gzip: 900.36 kB
+✓ built in 8.70s
+[prerender] dist-test  base=/  site=https://brianm53.github.io/mckeown-industrial-works/
+  assets/pf-barlow-latin-400-normal-b0a8ad37ac.woff2              21.7 kB
+  assets/pf-barlow-latin-600-normal-4b52ddd483.woff2              22.2 kB
+  assets/pf-barlow-condensed-latin-600-normal-215a93c696.woff2    21.8 kB
+  assets/pf-barlow-condensed-latin-700-normal-3787a5a419.woff2    21.9 kB
+  assets/pf-ibm-plex-mono-latin-400-normal-08949f728d.woff2       14.4 kB
+  assets/pf-ibm-plex-mono-latin-600-normal-0d1f0b8d07.woff2       15.3 kB
+  portfolio/index.html                                            62.2 kB
+  index.html                                                       4.2 kB
+  404.html                                                         4.2 kB
+  sitemap.xml                                                      0.3 kB
+  robots.txt                                                       0.1 kB
+  health.json                                                      0.2 kB
+
+Running 61 tests using 2 workers
+
+  ✓   1 [desktop] › tests/e2e/factory.spec.ts:62:3 › §12.9 rocket production cycle › §12.9 rocket assembles, wheels out, counts down, launches, records the outcome and the next rocket starts (708ms)
+  ✓   3 [desktop] › tests/e2e/factory.spec.ts:97:3 › §12.9 rocket production cycle › §12.9 a failed launch is recorded too and production keeps going (shortcut via skipToLaunch) (526ms)
+  ✓   2 [desktop] › tests/e2e/audio.spec.ts:35:3 › §12.14 audio consent, mute and volume › §12.14 no AudioContext and no sound before consent, even after interacting with the world (9.5s)
+  ✓   4 [desktop] › tests/e2e/factory.spec.ts:114:3 › §12.10 optimization minigame › §12.10 console parameters change throughput/defects per the model, and reset restores the baseline (8.7s)
+  ✓   5 [desktop] › tests/e2e/audio.spec.ts:58:3 › §12.14 audio consent, mute and volume › §12.14 the Sound button grants consent and starts the audio engine (6.5s)
+  ✓   7 [desktop] › tests/e2e/audio.spec.ts:72:3 › §12.14 audio consent, mute and volume › §12.14 Sound button mutes (master gain 0) and unmutes (9.8s)
+  ✓   8 [desktop] › tests/e2e/audio.spec.ts:88:3 › §12.14 audio consent, mute and volume › §12.14 Settings: mute switch and master / music / effects sliders control the gains (17.7s)
+  ✓   9 [desktop] › tests/e2e/lite.spec.ts:46:3 › §12.2 HTML menu, directory and panels without 3D › §12.2 lite mode renders the menu, directory and portfolio without creating a WebGL context (13.1s)
+  ✓  10 [desktop] › tests/e2e/lite.spec.ts:61:3 › §12.2 HTML menu, directory and panels without 3D › §12.2 top bar is reachable with Tab and every control has an accessible name (1.7s)
+  ✓  11 [desktop] › tests/e2e/lite.spec.ts:78:3 › §12.2 HTML menu, directory and panels without 3D › §12.2 keyboard: M opens the directory, focus moves into the dialog, Esc closes and focus returns (5.0s)
+  ✓  12 [desktop] › tests/e2e/lite.spec.ts:123:3 › §12.3 principal stations via the directory › §12.3 the directory lists the five principal stations first (1.9s)
+  ✓  13 [desktop] › tests/e2e/lite.spec.ts:135:5 › §12.3 principal stations via the directory › §12.3 Open now → resume panel renders its content and links, closes with Esc (4.8s)
+  ✓  14 [desktop] › tests/e2e/lite.spec.ts:135:5 › §12.3 principal stations via the directory › §12.3 Open now → harmony panel renders its content and links, closes with ✕ (4.5s)
+  ✓  15 [desktop] › tests/e2e/lite.spec.ts:135:5 › §12.3 principal stations via the directory › §12.3 Open now → codestory panel renders its content and links, closes with Esc (3.7s)
+  ✓  16 [desktop] › tests/e2e/lite.spec.ts:135:5 › §12.3 principal stations via the directory › §12.3 Open now → github panel renders its content and links, closes with ✕ (4.0s)
+  ✓  17 [desktop] › tests/e2e/lite.spec.ts:135:5 › §12.3 principal stations via the directory › §12.3 Open now → rec panel renders its content and links, closes with Esc (4.3s)
+  ✓   6 [desktop] › tests/e2e/forklift.spec.ts:92:3 › §12.8 forklift › §12.8 enter with E, drive with W, steer with D, exit with E — twice in a row (41.7s)
+  ✓  18 [desktop] › tests/e2e/lite.spec.ts:157:3 › §12.3 principal stations via the directory › §12.3 every directory entry with "Open now" opens and closes its panel (incl. contact and R&D) (12.9s)
+  ✓  20 [desktop] › tests/e2e/lite.spec.ts:193:3 › §12.15 fallback without WebGL › §12.15 no WebGL → HTML portfolio with working quick links, directory and panels (17.6s)
+  ✓  21 [desktop] › tests/e2e/lite.spec.ts:234:3 › §12.18 accessibility (axe-core) › §12.18 axe: /?lite=1 has no serious or critical violations (3.6s)
+  ✓  22 [desktop] › tests/e2e/lite.spec.ts:239:3 › §12.18 accessibility (axe-core) › §12.18 axe: static /portfolio/ has no serious or critical violations (4.3s)
+  ✓  23 [desktop] › tests/e2e/lite.spec.ts:246:5 › §12.18 accessibility (axe-core) › §12.18 axe: open resume panel has no serious or critical violations (3.4s)
+  ✓  24 [desktop] › tests/e2e/lite.spec.ts:246:5 › §12.18 accessibility (axe-core) › §12.18 axe: open directory panel has no serious or critical violations (4.3s)
+  ✓  25 [desktop] › tests/e2e/lite.spec.ts:246:5 › §12.18 accessibility (axe-core) › §12.18 axe: open settings panel has no serious or critical violations (4.8s)
+  ✓  19 [desktop] › tests/e2e/forklift.spec.ts:115:3 › §12.8 forklift › §12.8 the forklift collides with props and walls instead of passing through them (48.1s)
+  ✓  26 [desktop] › tests/e2e/lite.spec.ts:246:5 › §12.18 accessibility (axe-core) › §12.18 axe: open contact panel has no serious or critical violations (4.1s)
+  ✓  28 [desktop] › tests/e2e/motion.spec.ts:44:3 › §12.17 reduced motion › §12.17 prefers-reduced-motion turns on the reduced-motion setting and CSS (148ms)
+  ✓  27 [desktop] › tests/e2e/forklift.spec.ts:145:3 › §12.8 forklift › §12.8 overturn and R-recover work repeatedly (twice) and the forklift drives again (35.3s)
+  ✓  30 [desktop] › tests/e2e/forklift.spec.ts:174:3 › §12.8 forklift › §12.8 on foot: E on a tipped-over forklift sets it upright, then E drives it (13.4s)
+  ✓  29 [desktop] › tests/e2e/motion.spec.ts:52:3 › §12.17 reduced motion › §12.17 camera shake is ignored with reduced motion (and does move the camera without it) (50.3s)
+  ✓  32 [desktop] › tests/e2e/motion.spec.ts:70:3 › §12.17 reduced motion › §12.17 Night Shift with reduced motion: no light flicker, and a caption announces it (384ms)
+  ✓  31 [desktop] › tests/e2e/npc.spec.ts:57:3 › §12.12 NPC gag scheduling › §12.12 only one gag runs at a time, aborted actors are restored, and actors return to their waypoint (294ms)
+  ✓  34 [desktop] › tests/e2e/npc.spec.ts:98:3 › §12.12 NPC gag scheduling › §12.12 the natural scheduler respects per-gag cooldowns and never overlaps gags (792ms)
+  ✓  33 [desktop] › tests/e2e/player.spec.ts:82:3 › §12.6 third-person camera › §12.6 default view is a perspective third-person camera at human scale (not top-down/isometric) (110ms)
+  ✓  36 [desktop] › tests/e2e/player.spec.ts:106:3 › §12.6 third-person camera › §12.6 mouse drag orbits a full 360° around the worker (2.8m)
+  ✓  37 [desktop] › tests/e2e/player.spec.ts:137:3 › §12.6 third-person camera › §12.6 WASD stays camera-relative after orbiting with the mouse (28.2s)
+  ✓  35 [desktop] › tests/e2e/robustness.spec.ts:41:3 › §12.16 leaks and runtime errors › §12.16 handler / subscription counts stay flat across 10 panel cycles, factory resets, forklift rides and fast travel (3.8m)
+  ✓  38 [desktop] › tests/e2e/player.spec.ts:149:3 › §12.6 third-person camera › §12.6 mouse wheel zooms between the near and far limits (1.2m)
+  ✓  40 [desktop] › tests/e2e/player.spec.ts:186:3 › §12.6 third-person camera › §12.6 spring arm pulls the camera in front of the perimeter wall (11.3s)
+  ✓  41 [desktop] › tests/e2e/player.spec.ts:201:3 › §12.6 third-person camera › §12.6 indoors the camera stays inside, with a shorter boom under the eaves (4.5s)
+  ✓  42 [desktop] › tests/e2e/player.spec.ts:222:3 › §12.6 third-person camera › §12.6 C recenters the camera behind the worker (33.3s)
+  ✓  39 [desktop] › tests/e2e/safety.spec.ts:37:3 › §12.11 OSHA restricted zone › §12.11 entering a restricted zone → inspector tackle → respawn at intake within 4 s; re-entry during cooldown only warns (18.1s)
+  ✓  44 [desktop] › tests/e2e/safety.spec.ts:115:3 › §12.13 Night Shift › §12.13 pressing the Night Shift button blacks out the factory, then restores normal lighting (27.0s)
+  ✓  45 [desktop] › tests/e2e/safety.spec.ts:150:3 › §12.13 Night Shift › §12.13 a stalled simulation clock cannot strand the player in darkness (watchdog restores light) (22.3s)
+  ✓  46 [desktop] › tests/e2e/smoke.spec.ts:15:3 › §12.1 build and deployed routes › §12.1 test build output exists (SPA shell, static portfolio, health, sitemap, robots, 404) (15ms)
+  ✓  47 [desktop] › tests/e2e/smoke.spec.ts:26:3 › §12.1 build and deployed routes › §12.1 health.json, sitemap.xml and robots.txt are served (78ms)
+  ✓  43 [desktop] › tests/e2e/player.spec.ts:249:3 › §12.5 player movement › §12.5 keyboard moves the worker in 4 cardinal + 4 diagonal directions relative to the camera (1.1m)
+  ✓  49 [desktop] › tests/e2e/player.spec.ts:269:3 › §12.5 player movement › §12.5 arrow keys and Shift-run also move the worker (24.4s)
+  ✓  48 [desktop] › tests/e2e/smoke.spec.ts:48:3 › §12.1 build and deployed routes › §12.1 /portfolio/ static page works without JavaScript (26.4s)
+  ✓  51 [desktop] › tests/e2e/smoke.spec.ts:61:3 › §12.1 build and deployed routes › §12.1 /portfolio/ with JavaScript loads without console errors (1.3s)
+  ✓  52 [desktop] › tests/e2e/smoke.spec.ts:70:3 › §12.1 build and deployed routes › §12.1 unknown paths still get a working page (SPA shell / 404 fallback) (1.9s)
+  ✓  53 [desktop] › tests/e2e/smoke.spec.ts:81:3 › §12.1 build and deployed routes › §12.1 deep link ?panel=<id> opens a portfolio panel on load (HTML mode) (2.2s)
+  ✓  50 [desktop] › tests/e2e/player.spec.ts:299:3 › §12.5 player movement › §12.5 the worker cannot leave the world bounds (perimeter walls) (40.7s)
+  ✓  54 [desktop] › tests/e2e/smoke.spec.ts:90:3 › §12.1 build and deployed routes › §12.1 deployed root boots the 3D factory with every module ready and no console errors (39.4s)
+  ✓  55 [desktop] › tests/e2e/player.spec.ts:329:3 › §12.7 interaction › §12.7 nearby target shows a prompt and E opens its panel; out-of-range targets are ignored (5.4s)
+  ✓  56 [desktop] › tests/e2e/smoke.spec.ts:106:3 › §12.4 external links › §12.4 link audit: every configured URL is syntactically valid and unverified URLs are flagged for owner review (1.8s)
+  ✓  57 [desktop] › tests/e2e/player.spec.ts:349:3 › §12.7 interaction › §12.7 interaction and movement do not activate through an open overlay (14.7s)
+  ✓  58 [desktop] › tests/e2e/smoke.spec.ts:125:3 › §12.4 external links › §12.4 rendered external links (static portfolio) are valid and open in a new tab safely (27.0s)
+  ✓  59 [desktop] › tests/e2e/player.spec.ts:379:3 › §12.3 directory reaches the stations in the 3D world › §12.3 "Travel there" takes the worker to each of the five principal stations (49.3s)
+  ✓  60 [mobile] › tests/e2e/mobile.spec.ts:48:3 › §12.15 mobile breakpoint › §12.15 mobile: touch controls are visible and the stick moves the worker (23.8s)
+  ✓  61 [mobile] › tests/e2e/mobile.spec.ts:69:3 › §12.15 mobile breakpoint › §12.15 mobile: menu, directory and portfolio panels are usable and fit the screen (9.0s)
+
+  Slow test file: [desktop] › tests/e2e/player.spec.ts (8.7m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  61 passed (14.4m)
+e2e exit 0
