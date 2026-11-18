@@ -2,6 +2,7 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
+import { portfolioDevServer } from './src/portfolio/devServer'
 
 // BASE_PATH: public base path (e.g. "/mckeown-industrial-works/" for GitHub Pages). Defaults to "/".
 // OUT_DIR: build output directory ("dist" for production, "dist-test" for the test-hook build).
@@ -12,7 +13,8 @@ const outDir = process.env.OUT_DIR ?? 'dist'
 export default defineConfig({
   base,
   cacheDir: process.env.VITE_CACHE_DIR ?? 'node_modules/.vite',
-  plugins: [react()],
+  // portfolioDevServer: serves /portfolio/ (the static HTML portfolio) under `vite dev`; dev-only.
+  plugins: [react(), portfolioDevServer()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: { port: 5173, host: '127.0.0.1' },
   preview: { host: '127.0.0.1' },
@@ -21,16 +23,8 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: false,
     chunkSizeWarningLimit: 3000,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules/three/')) return 'three'
-          if (id.includes('@dimforge') || id.includes('@react-three/rapier')) return 'physics'
-          if (id.includes('@react-three/')) return 'r3f'
-          return undefined
-        },
-      },
-    },
+    // No manualChunks: Rollup's natural splitting keeps three / r3f / Rapier inside the lazily
+    // loaded GameCanvas graph, so the entry chunk (UI + content) stays small for lite visitors.
   },
   test: {
     environment: 'jsdom',

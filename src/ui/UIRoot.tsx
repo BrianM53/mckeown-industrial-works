@@ -1,4 +1,4 @@
-import { Component, Suspense, useEffect, type ReactNode } from 'react'
+import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { ACHIEVEMENTS } from '@/content/achievements'
 import { registerDebug, recordDebugError } from '@/core/debug'
 import { events, useGameEvent } from '@/core/events'
@@ -6,7 +6,6 @@ import { useGameStore } from '@/state/game'
 import { useSettings } from '@/state/settings'
 import { useUIStore, type PanelId } from '@/state/ui'
 import { PRINCIPAL_ZONES, ZONES } from '@/world/layout'
-import { Hud } from './hud/Hud'
 import { Toasts } from './hud/Toasts'
 import { useUIKeyboard } from './input/useUIKeyboard'
 import { Panel } from './kit/Panel'
@@ -17,8 +16,12 @@ import { installModalityTracking, useIsTouch, useModality } from './lib/modality
 import { LoadingScreen } from './loading/LoadingScreen'
 import { panelRegistry, preloadPanels } from './panels/registry'
 import { TopBar } from './topbar/TopBar'
-import { TouchControls } from './touch/TouchControls'
 import './ui.css'
+
+// Game-mode-only layers are code-split: they read core/runtime (which pulls in three.js),
+// so keeping them out of the entry chunk means lite / no-WebGL visitors never download 3D code.
+const Hud = lazy(() => import('./hud/Hud').then((m) => ({ default: m.Hud })))
+const TouchControls = lazy(() => import('./touch/TouchControls').then((m) => ({ default: m.TouchControls })))
 import './panels/panels.css'
 
 /**
@@ -37,8 +40,12 @@ export default function UIRoot({ mode }: { mode: UIMode }) {
     <UIModeContext.Provider value={mode}>
       <div className="ui-root" data-mode={mode} data-touch={mode === 'game' && touch ? '' : undefined} data-panel={panelId ?? undefined}>
         <TopBar mode={mode} />
-        {mode === 'game' && <Hud />}
-        {mode === 'game' && <TouchControls />}
+        {mode === 'game' && (
+          <Suspense fallback={null}>
+            <Hud />
+            <TouchControls />
+          </Suspense>
+        )}
         {mode === 'game' && <LoadingScreen />}
         <PanelHost />
         <Toasts />

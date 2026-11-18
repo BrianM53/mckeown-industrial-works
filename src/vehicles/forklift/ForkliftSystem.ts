@@ -92,6 +92,8 @@ export class ForkliftSystem {
   rapier: typeof RAPIER | null = null
   /** The RigidBody's object (rapier-interpolated transform). */
   group: THREE.Object3D | null = null
+  /** The visual subtree (debug: is it shown right now?). */
+  visualObj: THREE.Object3D | null = null
   puffs: PuffPool | null = null
 
   // ---- state
@@ -1061,6 +1063,8 @@ export class ForkliftSystem {
           hint: this.hint,
           /** Seconds left of the current programmatic drive (0 = done). */
           driveLeft: round(this.input.testLeft),
+          /** Visual subtree shown (false while the camera fades the parked forklift out of the way). */
+          visible: this.visualObj ? this.visualObj.visible : null,
         }
       },
     }

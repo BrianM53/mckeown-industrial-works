@@ -183,7 +183,7 @@ export function Forklift({ puffs }: { puffs: PuffPool }) {
     },
   })
 
-  const anim = useRef({ spinF: 0, spinR: 0, prevSpeed: 0, accel: 0, pitch: 0, pitchV: 0, roll: 0, rollV: 0, fork: FORKLIFT.forkParked as number, beacon: 0, t: 0, look: 0, boundsDone: false })
+  const anim = useRef({ spinF: 0, spinR: 0, prevSpeed: 0, accel: 0, pitch: 0, pitchV: 0, roll: 0, rollV: 0, fork: FORKLIFT.forkParked as number, beacon: 0, t: 0, look: 0, boundsDone: false, rayOff: false })
 
   useFrame((_, dtRaw) => {
     const dt = clamp(Number.isFinite(dtRaw) ? dtRaw : 0, 0, 0.1)
@@ -288,9 +288,21 @@ export function Forklift({ puffs }: { puffs: PuffPool }) {
     // worker; once somebody drives it, it is always shown (the fader only
     // re-scans its flags every ~2 s, so never wait for it to un-hide us)
     const vis = refs.visual.current
+    sys.visualObj = vis
     if (vis) {
       vis.userData.cameraFade = !occupied
       if (occupied && !vis.visible) vis.visible = true
+      // The fader re-scans its flags only every ~2 s: while driving, also make the
+      // meshes invisible to its rays so it can never pop the forklift out from
+      // under the driver (only touched on enter / exit).
+      if (a.rayOff !== occupied) {
+        a.rayOff = occupied
+        vis.traverse((o) => {
+          if (!(o as THREE.Mesh).isMesh) return
+          if (occupied) o.raycast = NO_RAYCAST
+          else delete (o as Partial<THREE.Object3D>).raycast
+        })
+      }
     }
   })
 

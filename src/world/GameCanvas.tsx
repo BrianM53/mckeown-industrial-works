@@ -42,7 +42,7 @@ export default function GameCanvas() {
   return (
     <div className="game-canvas" data-game-focus tabIndex={-1} aria-label="3D factory view. Use W A S D or arrow keys to walk, drag to look around.">
       <Canvas
-        shadows={quality === 'low' ? false : { type: THREE.PCFSoftShadowMap }}
+        shadows={quality === 'low' ? false : { type: THREE.PCFShadowMap }}
         dpr={DPR[quality]}
         gl={{ antialias: quality !== 'low', powerPreference: 'high-performance', stencil: false }}
         camera={{ fov: 55, near: 0.1, far: 520, position: [0, 3.2, 38] }}

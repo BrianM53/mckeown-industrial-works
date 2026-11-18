@@ -4,7 +4,7 @@
  *
  * Usage:
  *   node scripts/shot.mjs [--url http://127.0.0.1:5173/] [--query "quality=low&noevents=1"]
- *        [--size 1280x720] [--gpu] [--timeout 90000]
+ *        [--size 1280x720] [--gpu] [--reduced] [--timeout 90000]
  *        --shots '<JSON array>'      (or a single shot via --out/--at/--cam/--eval/--keys/--wait)
  *
  * A shot is: {
@@ -51,6 +51,8 @@ const launchArgs = flag('gpu')
 
 const browser = await chromium.launch({ args: launchArgs })
 const page = await browser.newPage({ viewport: { width: w, height: h } })
+// --reduced: emulate prefers-reduced-motion (the settings store defaults reducedMotion from it).
+if (flag('reduced')) await page.emulateMedia({ reducedMotion: 'reduce' })
 const logs = []
 page.on('console', (m) => {
   if (m.type() === 'error' || m.type() === 'warning') logs.push({ type: m.type(), text: m.text().slice(0, 500) })
@@ -59,11 +61,18 @@ page.on('pageerror', (e) => logs.push({ type: 'pageerror', text: String(e).slice
 
 const url = base + (base.includes('?') ? '&' : '?') + query
 const t0 = Date.now()
-await page.goto(url, { waitUntil: 'domcontentloaded', timeout })
-try {
-  await page.waitForFunction(() => window.__MIW__?.ready === true, null, { timeout })
-} catch {
-  console.log(JSON.stringify({ warning: 'world did not report ready', after_ms: Date.now() - t0 }))
+// Boot with one retry: Chromium on WSL occasionally aborts Vite module imports with
+// net::ERR_NETWORK_CHANGED, leaving module slots in 'error'. Reload once if that happens.
+for (let attempt = 0; attempt < 2; attempt++) {
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout })
+  try {
+    await page.waitForFunction(() => window.__MIW__?.ready === true, null, { timeout })
+  } catch {
+    console.log(JSON.stringify({ warning: 'world did not report ready', after_ms: Date.now() - t0 }))
+  }
+  const failed = await page.evaluate(() => Object.entries(window.__MIW__?.modules ?? {}).filter(([, v]) => v === 'error').map(([k]) => k)).catch(() => [])
+  if (!failed.length) break
+  console.log(JSON.stringify({ warning: 'module slots failed, reloading once', failed }))
 }
 console.log(JSON.stringify({ ready_ms: Date.now() - t0 }))
 
