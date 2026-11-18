@@ -141,6 +141,22 @@ describe('controls hint', () => {
     expect(useUIStore.getState().controlsHintVisible).toBe(false)
   })
 
+  it('steps aside for good once the visitor talks to someone', () => {
+    vi.useFakeTimers()
+    renderGame()
+    act(() => useUIStore.getState().openDialogue({ npcId: 'greeter', name: 'Dot', role: 'Visitor Intake', lines: ['Hello.'] }))
+    act(() => vi.advanceTimersByTime(300))
+    expect(useUIStore.getState().controlsHintVisible).toBe(false)
+  })
+
+  it('pauses its clock while a panel is open', () => {
+    vi.useFakeTimers()
+    renderGame()
+    act(() => useUIStore.getState().openPanel('help'))
+    act(() => vi.advanceTimersByTime((HINT_SECONDS + 2) * 1000))
+    expect(useUIStore.getState().controlsHintVisible).toBe(true)
+  })
+
   it('respects controlsHintVisible set by other modules', () => {
     act(() => useUIStore.getState().setControlsHintVisible(false))
     renderGame()
@@ -204,6 +220,25 @@ describe('dialogue bubble', () => {
     expect(host).toHaveTextContent('Second line.')
     fireEvent.keyDown(window, { key: ' ' })
     expect(useUIStore.getState().dialogue).toBeNull()
+  })
+
+  it('consumes the E that closes the last line, so the game cannot re-interact with the same press', async () => {
+    renderGame()
+    // Stands in for the player module's window keydown listener (bubble phase).
+    const gameKeys = vi.fn()
+    window.addEventListener('keydown', gameKeys)
+    try {
+      act(() => useUIStore.getState().openDialogue({ npcId: 'greeter', name: 'Dot', role: 'Visitor Intake', lines: ['Only line.'] }))
+      await act(() => new Promise((r) => setTimeout(r, 180)))
+      fireEvent.keyDown(document.body, { key: 'e' })
+      expect(useUIStore.getState().dialogue).toBeNull()
+      expect(gameKeys).not.toHaveBeenCalled()
+      // With the bubble gone, E belongs to the game again.
+      fireEvent.keyDown(document.body, { key: 'e' })
+      expect(gameKeys).toHaveBeenCalledTimes(1)
+    } finally {
+      window.removeEventListener('keydown', gameKeys)
+    }
   })
 
   it('clicking the card advances and ✕ closes', async () => {

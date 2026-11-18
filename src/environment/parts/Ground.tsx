@@ -91,7 +91,12 @@ function buildGround(atlas: FloorAtlas): GroundGeo {
 
   // ---- asphalt -------------------------------------------------------------
   const asphaltRects = [...PATHS.filter((p) => p.kind === 'avenue' || p.kind === 'road').map((p) => p.rect), PARKING, APRON, GATE_ROAD, HIGHWAY]
-  for (const r of disjointUnion(asphaltRects)) fillRect(b, 'asphalt', r, ENV_PALETTE.asphalt, Y.asphalt)
+  for (const r of disjointUnion(asphaltRects)) {
+    const cx = (r.minX + r.maxX) / 2
+    const cz = (r.minZ + r.maxZ) / 2
+    const lot = [PARKING, APRON].some((q) => cx > q.minX && cx < q.maxX && cz > q.minZ && cz < q.maxZ)
+    fillRect(b, 'asphalt', r, lot ? ENV_PALETTE.lotAsphaltWorn : ENV_PALETTE.roadAsphalt, Y.asphalt)
+  }
 
   // ---- lane lines (clipped where other paths join) ---------------------------
   const lanes = PATHS.filter((p) => LANE_KINDS.includes(p.kind))
@@ -144,6 +149,23 @@ function buildGround(atlas: FloorAtlas): GroundGeo {
 
   // ---- building thresholds: zone band + hazard strip + interior floor ---------
   for (const bd of BUILDINGS) buildThreshold(b, bd)
+
+  // ---- principal outdoor zone (Recreation Yard): gate threshold + painted boundary
+  {
+    const zone = ZONES.rec
+    const r = zone.bounds
+    const spur = PATHS.find((p) => p.id === 'spur-rec')?.rect
+    if (spur) {
+      fillRect(b, 'fill', { minX: r.minX, maxX: r.minX + 1.25, minZ: spur.minZ, maxZ: spur.maxZ }, zone.color, Y.fill, 2)
+      const inset = 0.3
+      const gate: [number, number] = [spur.minZ - 0.6, spur.maxZ + 0.6]
+      for (const [a, c] of subtractIntervals(r.minZ + inset, r.maxZ - inset, [gate], 0.3)) lineQuad(b, 'line', 'z', r.minX + inset, a, c, 0.14, zone.color, Y.line)
+      lineQuad(b, 'line', 'z', r.maxX - inset, r.minZ + inset, r.maxZ - inset, 0.14, zone.color, Y.line)
+      // (horizontal runs stop short of the vertical ones: no coplanar overlap at the corners)
+      lineQuad(b, 'line', 'x', r.minZ + inset, r.minX + inset + 0.07, r.maxX - inset - 0.07, 0.14, zone.color, Y.line)
+      lineQuad(b, 'line', 'x', r.maxZ - inset, r.minX + inset + 0.07, r.maxX - inset - 0.07, 0.14, zone.color, Y.line)
+    }
+  }
 
   // ---- intake: welcome mat, spawn ring, stencils -------------------------------
   const teal = '#3E6E6A'

@@ -8,6 +8,7 @@ import {
   clampOpt,
   computeCull,
   crowdGain,
+  crowdWeight,
   distance3,
   DuckController,
   edgeFade,
@@ -17,6 +18,7 @@ import {
   occlusionFor,
   RateLimiter,
   SPATIAL,
+  voiceLoudness,
   volumeToGain,
   type CullItem,
   type Occlusion,
@@ -27,7 +29,7 @@ import { DEBUG_ENABLED } from '@/core/debug'
 import { clatterBuffer, impulse, noiseBuffer } from './synth/buffers'
 import { idle, panningModelFor, type Synth } from './synth/core'
 import { LOOP_LIBRARY, LOOP_META } from './synth/loops'
-import { SFX_LIBRARY, SFX_META, sfxLevel } from './synth/sfx'
+import { SFX_LIBRARY, SFX_META } from './synth/sfx'
 import type { LoopEnv, LoopMeta, SfxMeta } from './synth/types'
 import { buildLoop, buildOneShot, placePanner, type BuiltLoop } from './voice'
 
@@ -108,7 +110,21 @@ interface Voice extends VoiceSlot {
   dur: number
   /** Score before envelope weighting. */
   base: number
+  /** Linear peak level at the listener (target peak × volume × distance × occlusion), for crowd normalization. */
+  loud: number
+  /** Wall-clock seconds when queued (drops voices queued on a context that never started). */
+  queued: number
 }
+
+/**
+ * Right after the visitor's click the context may still report 'suspended'
+ * for a moment (Firefox / Safari start it asynchronously). Sounds requested in
+ * that window are scheduled anyway and start as soon as it runs — so the
+ * Sound button's own confirmation click is heard everywhere.
+ */
+const RESUME_GRACE_S = 0.6
+/** Queued voices older than this (wall clock) when the context finally runs are dropped, never played late. */
+const STALE_VOICE_S = 1
 
 interface Emitter extends CullItem {
   loop: LoopName
@@ -203,6 +219,10 @@ export class AudioEngine {
   private power = 1
   private quality: QualityTier = 'medium'
   private slowAcc = 0
+  /** Wall-clock time of the last resume() request while not running (0 = none pending). */
+  private resumeAt = 0
+  /** update() saw the context running last frame (detects suspended → running transitions). */
+  private wasRunning = false
   private lastPlayed: string[] = []
   private dropped = { rateLimited: 0, rejected: 0, stolen: 0, outOfRange: 0 }
   private warned = new Set<string>()
@@ -320,6 +340,8 @@ export class AudioEngine {
     this.mixer?.dispose()
     this.mixer = null
     this.warm = false
+    this.wasRunning = false
+    this.resumeAt = 0
     const ctx = this.ctx
     this.ctx = null
     if (ctx && ctx.state !== 'closed') {
@@ -477,6 +499,7 @@ export class AudioEngine {
     } else if (this.suspendTimer === null) {
       this.suspendTimer = setTimeout(() => {
         this.suspendTimer = null
+        this.resumeAt = 0
         const c = this.ctx
         if (c && this.masterTarget() === 0 && c.state === 'running') {
           try {
@@ -492,11 +515,22 @@ export class AudioEngine {
   private resume(): void {
     const ctx = this.ctx
     if (!ctx || ctx.state === 'running' || ctx.state === 'closed') return
+    this.resumeAt = this.now()
     try {
       ctx.resume().catch(() => {})
     } catch {
       /* ignore */
     }
+  }
+
+  /**
+   * May one-shots be scheduled right now? Running, or a resume was requested
+   * moments ago (see RESUME_GRACE_S). Never while muted / hidden / without consent.
+   */
+  private canSchedule(ctx: AudioContext): boolean {
+    if (!this.consent || this.muted || this.hidden) return false
+    if (ctx.state === 'running') return true
+    return ctx.state === 'suspended' && this.resumeAt > 0 && this.now() - this.resumeAt < RESUME_GRACE_S
   }
 
   private applyBuses(fast: boolean): void {
@@ -552,7 +586,7 @@ export class AudioEngine {
   play(name: SfxName, opts?: PlayOptions): void {
     const ctx = this.ctx
     const mx = this.mixer
-    if (!ctx || !mx || !this.consent || this.muted || this.hidden || ctx.state !== 'running') return
+    if (!ctx || !mx || !this.canSchedule(ctx)) return
     const meta = (SFX_META as Record<string, SfxMeta | undefined>)[name]
     if (!meta || !(name in SFX_LIBRARY)) return
     const volume = clampOpt(opts?.volume, 0, 4, 1)
@@ -579,14 +613,17 @@ export class AudioEngine {
       distGain = inverseDistanceGain(dist, meta.ref, meta.rolloff)
       occ = occlusionFor(this.interior, spaceAt(pos[0], pos[2]))
     }
-    if (!this.limiter.allow(name, this.now(), meta.minInterval)) {
+    const wall = this.now()
+    if (!this.limiter.allow(name, wall, meta.minInterval, pos ? pos[0] : Number.NaN, pos ? pos[2] : Number.NaN)) {
       this.dropped.rateLimited++
       return
     }
     const t = ctx.currentTime
     this.reap(t)
     for (const v of this.voices) v.score = v.base * envelopeWeight(t - v.started, v.dur)
-    const score = sfxLevel(name) * volume * distGain * occ.gain * meta.priority
+    // audibility at the listener: the normalized peak (not the raw synth gain) × volume × distance × walls
+    const loud = voiceLoudness(meta.peakDb, volume, distGain, occ.gain)
+    const score = loud * meta.priority
     const adm = admitVoice(this.voices, this.maxVoices(), { name, score, perNameCap: meta.maxVoices, policy: meta.onLimit })
     if (!adm.admit) {
       this.dropped.rejected++
@@ -610,18 +647,47 @@ export class AudioEngine {
       start,
     )
     if (!built) return
-    this.voices.push({ id: this.nextId++, name, started: t, score, base: score, synth: built.synth, out: built.out, end: built.end, dur: built.end - start })
+    this.voices.push({
+      id: this.nextId++,
+      name,
+      started: t,
+      score,
+      base: score,
+      loud,
+      queued: wall,
+      synth: built.synth,
+      out: built.out,
+      end: built.end,
+      dur: built.end - start,
+    })
     this.lastPlayed.push(name)
     if (this.lastPlayed.length > 16) this.lastPlayed.shift()
     this.updateCrowd()
   }
 
-  private killVoice(id: number): void {
-    const i = this.voices.findIndex((v) => v.id === id)
+  /** The context just started running: drop voices queued long ago on a context that would not start. */
+  private dropStaleVoices(): void {
+    const wall = this.now()
+    const now = this.ctx ? this.ctx.currentTime : 0
+    for (let i = this.voices.length - 1; i >= 0; i--) {
+      const v = this.voices[i]
+      // queued long ago but the context clock has not reached it: it was never heard
+      if (wall - v.queued > STALE_VOICE_S && v.started >= now - 0.05) this.killVoice(v.id, false)
+    }
+  }
+
+  private killVoice(id: number, stolen = true): void {
+    let i = -1
+    for (let k = 0; k < this.voices.length; k++) {
+      if (this.voices[k].id === id) {
+        i = k
+        break
+      }
+    }
     if (i < 0) return
     const v = this.voices[i]
     this.voices.splice(i, 1)
-    this.dropped.stolen++
+    if (stolen) this.dropped.stolen++
     const ctx = this.ctx
     const now = ctx ? ctx.currentTime : 0
     try {
@@ -653,8 +719,13 @@ export class AudioEngine {
     const ctx = this.ctx
     const mx = this.mixer
     if (!ctx || !mx) return
+    const t = ctx.currentTime
     let n = 0
-    for (const v of this.voices) n += Math.min(1, v.base / 0.25)
+    for (const v of this.voices) {
+      // UI sounds bypass the one-shot bus; decaying voices weigh less
+      if (SFX_META[v.name as SfxName]?.ui) continue
+      n += crowdWeight(v.loud * envelopeWeight(t - v.started, v.dur))
+    }
     const g = crowdGain(n)
     if (Math.abs(g - this.crowdApplied) < 0.02) return
     this.crowdApplied = g
@@ -719,37 +790,62 @@ export class AudioEngine {
       stopped: false,
     }
     this.emitters.push(e)
-    if (this.ctx) this.cullTick()
+    // realize on the next frame's cull tick (budgeted): a burst of loop() calls never spikes one frame
+    this.slowAcc = Math.max(this.slowAcc, 0.1)
+    // Handle methods may be called every frame (movers): inline try/catch, no per-call closures.
     return {
-      setVolume: (v) =>
-        this.guard('setVolume', () => {
+      setVolume: (v) => {
+        try {
           const nv = clampOpt(v, 0, 4, e.volume)
           if (nv === e.volume || e.stopped) return
           e.volume = nv
           this.applyEmitterGain(e, false)
-        }),
-      setRate: (r) =>
-        this.guard('setRate', () => {
+        } catch (err) {
+          this.warnOnce('setVolume', err)
+        }
+      },
+      setRate: (r) => {
+        try {
           const nr = clampOpt(r, 0.1, 4, e.rate)
           if (Math.abs(nr - e.rate) < 1e-3 || e.stopped) return
           e.rate = nr
           const ctx = this.ctx
           if (e.built && ctx) e.built.voice.setRate(nr, ctx.currentTime)
-        }),
-      setPosition: (x, y, z) =>
-        this.guard('setPosition', () => {
-          if (!e.positional || e.stopped || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return
-          if (e.validPos && Math.abs(x - e.x) < 0.005 && Math.abs(y - e.y) < 0.005 && Math.abs(z - e.z) < 0.005) return
-          e.x = x
-          e.y = y
-          e.z = z
-          e.validPos = true
-          e.space = spaceAt(x, z)
-          const ctx = this.ctx
-          if (e.built?.panner && ctx && ctx.state === 'running') placePanner(e.built.panner, x, y, z, 0.03, ctx.currentTime)
-        }),
-      stop: () => this.guard('stop', () => this.removeEmitter(e)),
+        } catch (err) {
+          this.warnOnce('setRate', err)
+        }
+      },
+      setPosition: (x, y, z) => {
+        try {
+          this.moveEmitter(e, x, y, z)
+        } catch (err) {
+          this.warnOnce('setPosition', err)
+        }
+      },
+      stop: () => {
+        try {
+          this.removeEmitter(e)
+        } catch (err) {
+          this.warnOnce('stop', err)
+        }
+      },
     }
+  }
+
+  private moveEmitter(e: Emitter, x: number, y: number, z: number): void {
+    if (!e.positional || e.stopped || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return
+    if (e.validPos && Math.abs(x - e.x) < 0.005 && Math.abs(y - e.y) < 0.005 && Math.abs(z - e.z) < 0.005) return
+    e.x = x
+    e.y = y
+    e.z = z
+    e.validPos = true
+    e.space = spaceAt(x, z)
+    const ctx = this.ctx
+    const panner = e.built?.panner
+    if (!panner || !ctx) return
+    // glide while running; jump while suspended (no clock to glide on) so it is right on resume
+    if (ctx.state === 'running') placePanner(panner, x, y, z, 0.03, ctx.currentTime)
+    else placePanner(panner, x, y, z, 0, null)
   }
 
   private removeEmitter(e: Emitter): void {
@@ -954,9 +1050,19 @@ export class AudioEngine {
   update(dt: number): void {
     if (!this.started) return
     const ctx = this.ctx
-    if (!ctx || !this.mixer || ctx.state !== 'running') return
+    if (!ctx || !this.mixer) return
+    if (ctx.state !== 'running') {
+      this.wasRunning = false
+      return
+    }
     const t0 = DEBUG_ENABLED ? performance.now() : 0
-    this.guard('update', () => {
+    // (inline try/catch rather than guard(): no closure allocated per frame)
+    try {
+      if (!this.wasRunning) {
+        this.wasRunning = true
+        this.resumeAt = 0
+        this.dropStaleVoices()
+      }
       const tl = DEBUG_ENABLED ? performance.now() : 0
       this.applyListener(dt)
       if (DEBUG_ENABLED) this.perf.listener += performance.now() - tl
@@ -970,7 +1076,9 @@ export class AudioEngine {
         this.updateCrowd()
         if (DEBUG_ENABLED) this.perf.slow += performance.now() - ts
       }
-    })
+    } catch (err) {
+      this.warnOnce('update', err)
+    }
     if (DEBUG_ENABLED) {
       const d = performance.now() - t0
       const p = this.perf
@@ -1003,7 +1111,10 @@ export class AudioEngine {
     const L = this.listener
     if (!ctx || !L.dirty) return
     L.dirty = false
-    const [x, y, z] = this.listenerPos()
+    const P = this.listenerPos()
+    const x = P[0]
+    const y = P[1]
+    const z = P[2]
     const ls = ctx.listener
     if (ls.positionX) {
       const end = ctx.currentTime + Math.min(0.1, Math.max(0.016, Number.isFinite(dt) ? dt : 0.016))

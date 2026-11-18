@@ -82,20 +82,62 @@ export function distance3(ax: number, ay: number, az: number, bx: number, by: nu
 // Rate limiting
 // ---------------------------------------------------------------------------
 
-/** Per-key minimum interval between plays (e.g. footsteps ≥ 0.18 s apart). */
-export class RateLimiter {
-  private last = new Map<string, number>()
+interface RecentPlay {
+  t: number
+  /** NaN for a non-positional play. */
+  x: number
+  z: number
+}
 
-  /** True (and records the time) when `key` may play at `now` (seconds). */
-  allow(key: string, now: number, minInterval: number): boolean {
-    const prev = this.last.get(key)
-    if (prev !== undefined && now - prev < minInterval && now >= prev) return false
-    this.last.set(key, now)
+/** Recent plays remembered per key (older ones can no longer block anything useful). */
+const RECENT_PER_KEY = 8
+
+/**
+ * Per-name minimum interval between plays (e.g. footsteps ≥ 0.18 s apart,
+ * impacts ≥ 0.1 s apart). Positional plays are limited per SOURCE: a play is
+ * rejected when the same name played within `minInterval` closer than
+ * `radius` (m) on the ground plane — so one machine/actor can never spam a
+ * sound (and two modules reporting the same event at the same spot never
+ * double up), while two different crates or a passer-by's footstep don't
+ * silence each other. Non-positional plays conflict with every recent play of
+ * the name. A rejected call never extends the window; a clock that went
+ * backwards never blocks.
+ */
+export class RateLimiter {
+  private recent = new Map<string, RecentPlay[]>()
+
+  /** True (and records the play) when `key` may play at `now` (seconds). */
+  allow(key: string, now: number, minInterval: number, x = Number.NaN, z = Number.NaN, radius = 2.5): boolean {
+    let list = this.recent.get(key)
+    if (!list) {
+      list = []
+      this.recent.set(key, list)
+    }
+    const positional = Number.isFinite(x) && Number.isFinite(z)
+    const r2 = radius * radius
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i]
+      if (!(now - p.t < minInterval && now >= p.t)) continue
+      if (!positional || Number.isNaN(p.x)) return false
+      const dx = p.x - x
+      const dz = p.z - z
+      if (dx * dx + dz * dz < r2) return false
+    }
+    // record (reuse the oldest slot once the ring is full: no growth, little garbage)
+    if (list.length < RECENT_PER_KEY) list.push({ t: now, x: positional ? x : Number.NaN, z: positional ? z : Number.NaN })
+    else {
+      let oldest = 0
+      for (let i = 1; i < list.length; i++) if (list[i].t < list[oldest].t) oldest = i
+      const p = list[oldest]
+      p.t = now
+      p.x = positional ? x : Number.NaN
+      p.z = positional ? z : Number.NaN
+    }
     return true
   }
 
   reset(): void {
-    this.last.clear()
+    this.recent.clear()
   }
 }
 
@@ -193,6 +235,17 @@ export function admitVoice(active: readonly VoiceSlot[], cap: number, req: Admit
   return { admit: true, steal }
 }
 
+/**
+ * Linear peak a one-shot reaches at the listener: its normalized target peak
+ * (SfxMeta.peakDb) × play volume × distance gain × occlusion gain. This is
+ * what voice stealing and crowd normalization compare — never the raw synth
+ * gain (which compensates for how quiet a synth function happens to be).
+ */
+export function voiceLoudness(peakDb: number, volume: number, distanceGain: number, occlusionGain: number): number {
+  const v = dbToGain(peakDb) * volume * distanceGain * occlusionGain
+  return Number.isFinite(v) && v > 0 ? v : 0
+}
+
 /** Remaining-envelope weight used when scoring a playing voice (older → quieter). */
 export function envelopeWeight(age: number, duration: number): number {
   if (!(duration > 0)) return 0.1
@@ -243,8 +296,9 @@ export interface CullOptions {
 const byKey = (a: CullItem, b: CullItem) => a.key - b.key || a.id - b.id
 
 /**
- * Decide which loops are realized. Non-positional loops always are.
- * Positional loops: activate inside maxDistance, deactivate beyond
+ * Decide which loops are realized. Silent loops (weight 0, e.g. volume 0)
+ * never are — they cost nothing until turned up. Non-positional loops always
+ * are. Positional loops: activate inside maxDistance, deactivate beyond
  * maxDistance + hysteresis; then keep only the nearest `perName(name)` of each
  * name and the nearest `maxTotal` overall, so overlapping emitters never pile
  * up. Writes `want` on every item; returns the number of realized positional loops.
@@ -258,6 +312,10 @@ export function computeCull(
 ): number {
   order.length = 0
   for (const it of items) {
+    if (it.weight !== undefined && !(it.weight > 0)) {
+      it.want = false
+      continue
+    }
     if (!it.positional) {
       it.want = true
       continue
@@ -340,6 +398,14 @@ export function occlusionFor(listenerSpace: string | null, emitterSpace: string 
   if (listenerSpace === null) return OCC_EMITTER_INSIDE
   if (emitterSpace === null) return OCC_LISTENER_INSIDE
   return OCC_OTHER_BUILDING
+}
+
+/** A one-shot whose peak at the listener reaches this (−12 dB) counts as one "full" voice in the crowd. */
+export const CROWD_FULL = 0.25
+
+/** How much one playing voice (current loudness at the listener) counts toward the crowd, 0..1. */
+export function crowdWeight(loudness: number): number {
+  return Number.isFinite(loudness) && loudness > 0 ? Math.min(1, loudness / CROWD_FULL) : 0
 }
 
 /** Crowd normalization for the one-shot bus: many simultaneous voices are gently turned down. */

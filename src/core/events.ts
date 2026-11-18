@@ -31,12 +31,15 @@ export interface GameEvents {
   // ---- Factory / rocket ----
   'factory:part': { line: LineId; total: number }
   'factory:params': {}
+  /** `stage` = 0-based index of the stage just completed; stageName = ROCKET_STAGES[stage]. */
   'rocket:stage': { rocketId: number; stage: number; stageName: string }
   'rocket:complete': { rocketId: number }
   'rocket:rollout': { rocketId: number }
+  /** Fires with secondsLeft 10, 9, … 1; 'rocket:ignition' is zero. */
   'rocket:countdown': { rocketId: number; secondsLeft: number }
   'rocket:ignition': { rocketId: number }
   'rocket:liftoff': { rocketId: number }
+  /** Fires at the visual reveal (OUTCOME_REVEAL_AT[outcome] s into 'flight'), when counters update. */
   'rocket:outcome': { rocketId: number; outcome: LaunchOutcome; stowaway: boolean }
   'rocket:reset': { rocketId: number }
 

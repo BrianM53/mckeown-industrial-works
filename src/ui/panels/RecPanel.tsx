@@ -32,7 +32,7 @@ export default function RecPanel({ onClose }: PanelComponentProps) {
           </div>
           <div className="miw-howto__row">
             <dt>
-              <Icon name="ball" size={20} /> Volleyball
+              <Icon name="volleyball" size={20} /> Volleyball
             </dt>
             <dd>
               Walk up to the volleyball and press <Keycap size="sm">E</Keycap> to bump it over the net.

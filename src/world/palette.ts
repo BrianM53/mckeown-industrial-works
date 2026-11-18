@@ -62,4 +62,10 @@ export const ENV_PALETTE = {
   terracotta: '#B5643C',
   rubber: '#1C1F20',
   glassTint: '#8FB4B8',
+  /** Weathered road asphalt as painted on the campus avenues (lighter than raw asphalt so shade stays readable). */
+  roadAsphalt: '#6F7472',
+  /** Parking-lot / apron asphalt (slightly warmer, more worn). */
+  lotAsphaltWorn: '#77786F',
+  /** Ground bounce color of the image-based sky lighting. */
+  envGround: '#5E5246',
 } as const

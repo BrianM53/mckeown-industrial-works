@@ -94,28 +94,44 @@ class DeferredLoop implements LoopHandle {
     this.real = safe(() => target.loop(this.name, opts)) ?? null
   }
 
+  // These may run every frame (movers): non-finite input is ignored, and no closures are allocated.
   setVolume(v: number): void {
-    if (this.stopped) return
+    if (this.stopped || !Number.isFinite(v)) return
     this.opts.volume = v
     const r = this.real
-    if (r) safe(() => r.setVolume(v))
+    if (!r) return
+    try {
+      r.setVolume(v)
+    } catch (err) {
+      warn(err)
+    }
   }
 
   setRate(rate: number): void {
-    if (this.stopped) return
+    if (this.stopped || !Number.isFinite(rate)) return
     this.opts.rate = rate
     const r = this.real
-    if (r) safe(() => r.setRate(rate))
+    if (!r) return
+    try {
+      r.setRate(rate)
+    } catch (err) {
+      warn(err)
+    }
   }
 
   setPosition(x: number, y: number, z: number): void {
-    if (this.stopped || !this.positional) return
+    if (this.stopped || !this.positional || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return
     const p = this.opts.position!
     p[0] = x
     p[1] = y
     p[2] = z
     const r = this.real
-    if (r) safe(() => r.setPosition(x, y, z))
+    if (!r) return
+    try {
+      r.setPosition(x, y, z)
+    } catch (err) {
+      warn(err)
+    }
   }
 
   stop(): void {
@@ -128,11 +144,15 @@ class DeferredLoop implements LoopHandle {
   }
 }
 
+function warn(err: unknown): void {
+  console.warn('[audio] call failed', err)
+}
+
 function safe<T>(fn: () => T): T | undefined {
   try {
     return fn()
   } catch (err) {
-    console.warn('[audio] call failed', err)
+    warn(err)
     return undefined
   }
 }

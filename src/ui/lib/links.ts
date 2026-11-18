@@ -28,3 +28,14 @@ export function hostLabel(url: string): string {
     return url
   }
 }
+
+/** Human-readable destination: "https://www.linkedin.com/in/someone/" → "linkedin.com/in/someone". */
+export function displayUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    const path = u.pathname.replace(/\/+$/, '')
+    return `${u.hostname.replace(/^www\./, '')}${path}`
+  } catch {
+    return url
+  }
+}

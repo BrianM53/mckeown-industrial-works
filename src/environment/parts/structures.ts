@@ -231,12 +231,13 @@ function addRacks(ctx: BuildCtx): void {
       }
     }
   }
-  // branches into buildings over their spurs (above head height)
+  // Branches into the buildings (above head height). They enter the wall beside
+  // the entrance sign + zone beacon, never through them, and clear the light poles.
   const branches: { from: number; to: number; z: number; y: number; color: string; r: number }[] = [
-    { from: -HALL.x - 4.05, to: -30, z: 13.6, y: RACK.armY + 0.35, color: '#4F7A5A', r: 0.16 },
-    { from: -HALL.x - 2.15, to: -30, z: -8.4, y: RACK.armY + 0.4, color: '#C7CCCB', r: 0.2 },
-    { from: -HALL.x - 5.2, to: -30, z: -32.4, y: RACK.armY + 0.45, color: '#4F86A8', r: 0.2 },
-    { from: HALL.x + 1.1, to: 30, z: 11.6, y: RACK.armY + 0.32, color: '#A95E39', r: 0.14 },
+    { from: -HALL.x - 4.05, to: -30, z: 7.8, y: RACK.armY + 0.35, color: '#4F7A5A', r: 0.16 },
+    { from: -HALL.x - 2.15, to: -30, z: -13.6, y: RACK.armY + 0.4, color: '#C7CCCB', r: 0.2 },
+    { from: -HALL.x - 5.2, to: -30, z: -37.0, y: RACK.armY + 0.45, color: '#4F86A8', r: 0.2 },
+    { from: HALL.x + 1.1, to: 30, z: 15.2, y: RACK.armY + 0.32, color: '#A95E39', r: 0.14 },
   ]
   for (const br of branches) {
     const yRack = RACK.armY + 0.11 + br.r

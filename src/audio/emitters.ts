@@ -1,6 +1,6 @@
 import { createRng, hashString, type Rng } from '@/core/rng'
 import type { LineId, LoopName, Vec3 } from '@/core/types'
-import { ANCHORS, COLLECTOR, LINES, PAD, RESTRICTED_ZONES, ZONES, zoneAt, type LineDef } from '@/world/layout'
+import { ANCHORS, COLLECTOR, LINES, PAD, QC_ARCH, RESTRICTED_ZONES, ZONES, zoneAt, type LineDef } from '@/world/layout'
 
 /**
  * WORLD SOUND MAP — every positional machinery emitter, derived from
@@ -85,6 +85,45 @@ export const STEAM_SPOTS: Vec3[] = [
 ]
 /** Launch pad (rocket sounds). */
 export const PAD_POSITION: Vec3 = [PAD.center[0], 2, PAD.center[1]]
+
+const PAYLOAD = line('payload')
+/** Normalized payload-belt position (0 = zStart … 1 = zEnd) where items pass through the QC scanner arch. */
+export const QC_MARK = (PAYLOAD.zStart - QC_ARCH.position[1]) / (PAYLOAD.zStart - PAYLOAD.zEnd)
+/** The arch's scanner head (beeps when a payload item passes). */
+export const QC_SCANNER_POSITION: Vec3 = [QC_ARCH.position[0], QC_ARCH.height - 0.4, QC_ARCH.position[1]]
+
+/**
+ * Machine-cycle id of the newest belt item at or past normalized position
+ * `mark`, or −1 when none (items sorted DESCENDING; item i was made by cycle
+ * `cycles - (items.length - 1 - i)`, see systems/factory). It only grows as
+ * items pass the mark, so an increase means "an item just went through".
+ */
+export function newestItemPast(items: readonly number[], cycles: number, mark: number): number {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i] >= mark) return cycles - (items.length - 1 - i)
+  }
+  return -1
+}
+
+/** Detects items passing a mark on a belt: tick() is true once per newly passed item (never for the initial state or after a reset). */
+export class MarkWatcher {
+  private last: number | null = null
+
+  constructor(private readonly mark: number) {}
+
+  tick(items: readonly number[] | undefined, cycles: number | undefined): boolean {
+    if (!items || !Number.isFinite(cycles)) return false
+    const c = newestItemPast(items, cycles as number, this.mark)
+    if (this.last === null || c < this.last) {
+      // first look, the belt emptied past the mark, or the sim was reset: no event
+      this.last = c
+      return false
+    }
+    if (c === this.last) return false
+    this.last = c
+    return true
+  }
+}
 
 /**
  * Seeded "random but reproducible" event timer. tick(dt) returns true when

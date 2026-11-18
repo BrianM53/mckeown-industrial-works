@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { CONTROLS } from '@/content/controls'
 import type { RocketState } from '@/systems/factory/types'
 import { ROCKET_STAGES } from '@/systems/factory/types'
 import { PRINCIPAL_ZONES, ZONES, restrictedZoneAt, PLAYABLE_BOUNDS } from '@/world/layout'
@@ -7,7 +8,8 @@ import { DESTINATIONS } from './destinations'
 import { MAX_CAPTIONS, MAX_TOASTS, clearFeed, normalizeDuration, pushCaption, pushToast, useFeed } from './feed'
 import { clampStickCenter, stickVector } from './joystick'
 import { describeCounters, describeLaunch } from './launchStatus'
-import { assetHref, hostLabel, portfolioHref, repoPath } from './links'
+import { isPointerGesture } from '../kit/Binding'
+import { assetHref, displayUrl, hostLabel, portfolioHref, repoPath } from './links'
 
 afterEach(() => {
   clearFeed()
@@ -154,6 +156,24 @@ describe('links', () => {
     expect(assetHref('https://example.com/cv.pdf')).toBe('https://example.com/cv.pdf')
     expect(repoPath('https://github.com/BrianM53/Gaussian-SLAM')).toBe('BrianM53/Gaussian-SLAM')
     expect(hostLabel('https://www.codestory.co/episodes/x/')).toBe('codestory.co')
+    expect(displayUrl('https://www.linkedin.com/in/someone-123/')).toBe('linkedin.com/in/someone-123')
+    expect(displayUrl('https://brianm53.github.io/')).toBe('brianm53.github.io')
+    expect(displayUrl('not a url')).toBe('not a url')
+  })
+})
+
+describe('control bindings', () => {
+  it('tells mouse/touch gestures apart from keys', () => {
+    for (const g of ['Drag with mouse', 'Drag up/down', 'Mouse wheel', 'Wheel', 'Pinch']) expect(isPointerGesture(g), g).toBe(true)
+    for (const k of ['W A S D', 'Arrow keys', 'Shift (hold)', ', and . (or J / L)', '- and =', 'E', 'Space', 'Esc', '?']) expect(isPointerGesture(k), k).toBe(false)
+  })
+  it('classifies the mouse rows of content/controls.ts as gestures and the rest as keys', () => {
+    const look = CONTROLS.find((c) => /look around/i.test(c.action))!
+    expect(look.keys.map(isPointerGesture)).toEqual([true, false])
+    const zoom = CONTROLS.find((c) => /zoom/i.test(c.action))!
+    expect(zoom.keys.map(isPointerGesture)).toEqual([true, false])
+    const walk = CONTROLS.find((c) => c.action === 'Walk')!
+    expect(walk.keys.some(isPointerGesture)).toBe(false)
   })
 })
 

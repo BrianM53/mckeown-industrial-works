@@ -36,6 +36,8 @@ export default function App() {
 
   return (
     <>
+      {/* UI first in DOM order: the top bar / skip link precede the content for keyboard & screen-reader users. */}
+      <UIRoot mode={mode} />
       {mode === 'game' && (
         <CanvasBoundary onError={() => setMode({ mode: 'fallback', reason: 'error' })}>
           <Suspense fallback={null}>
@@ -48,7 +50,6 @@ export default function App() {
           <FallbackPortfolio reason={reason ?? 'requested'} />
         </Suspense>
       )}
-      <UIRoot mode={mode} />
     </>
   )
 }

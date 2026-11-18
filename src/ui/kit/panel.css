@@ -48,6 +48,13 @@
   max-width: 1060px;
 }
 
+/* header group (plate + hazard stripe + optional fiction ribbon) */
+.miw-panel__top {
+  position: relative;
+  z-index: 1;
+  flex: none;
+}
+
 /* ---- header: riveted equipment plate (same in both tones) ---- */
 .miw-panel__header {
   position: relative;
@@ -521,6 +528,27 @@
   .miw-panel__footer {
     padding-top: 6px;
     padding-bottom: calc(6px + var(--safe-bottom));
+  }
+}
+/*
+ * Very short viewports (200% zoom on a laptop, landscape phones): the whole sheet scrolls under
+ * the pinned header group and the footer flows after the content, instead of a fixed footer
+ * eating a third of the reading space. Keyboard scrolling still works: arrow keys scroll the
+ * nearest scrollable ancestor of the focused title / body.
+ */
+@media (max-height: 420px) {
+  .miw-panel {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .miw-panel__top {
+    position: sticky;
+    top: 0;
+  }
+  .miw-panel__body {
+    flex: 1 0 auto;
+    overflow: visible;
   }
 }
 @media (pointer: coarse) {

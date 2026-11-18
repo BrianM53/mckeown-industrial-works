@@ -32,6 +32,17 @@ describe('Top bar', () => {
     expect(skip).toHaveAttribute('href', '/portfolio/')
   })
 
+  it('in game mode the first tab stop is a skip link to the portfolio page (not in fallback)', async () => {
+    const user = userEvent.setup()
+    const { unmount } = renderInMode(<TopBar mode="game" />)
+    await user.tab()
+    expect(document.activeElement).toBe(screen.getByTestId('skip-link'))
+    expect(screen.getByTestId('skip-link')).toHaveAttribute('href', '/portfolio/')
+    unmount()
+    renderInMode(<TopBar mode="fallback" />, 'fallback')
+    expect(screen.queryByTestId('skip-link')).toBeNull()
+  })
+
   it('buttons toggle their panels', async () => {
     const user = userEvent.setup()
     renderInMode(<TopBar mode="game" />)
@@ -61,6 +72,18 @@ describe('Top bar', () => {
     await user.keyboard('{Escape}')
     // Esc handling lives in the global keyboard hook (UIRoot); here a second click closes it.
     await user.click(btn)
+    expect(btn).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('the narrow-screen menu closes when keyboard focus leaves it', async () => {
+    const user = userEvent.setup()
+    renderInMode(<TopBar mode="game" />)
+    const btn = screen.getByRole('button', { name: 'Menu' })
+    await user.click(btn)
+    expect(btn).toHaveAttribute('aria-expanded', 'true')
+    screen.getByTestId('open-help').focus() // still inside the menu
+    expect(btn).toHaveAttribute('aria-expanded', 'true')
+    act(() => screen.getByTestId('skip-game').focus()) // Tab past the last item
     expect(btn).toHaveAttribute('aria-expanded', 'false')
   })
 })
@@ -97,6 +120,17 @@ describe('Sound toggle (opt-in)', () => {
     await user.click(btn)
     expect(muted()).toBe(false)
     off()
+  })
+
+  it('is inert in the HTML fallback (no audio engine runs there) and never grants consent', async () => {
+    const user = userEvent.setup()
+    renderInMode(<TopBar mode="fallback" />, 'fallback')
+    const btn = screen.getByTestId('sound-toggle')
+    expect(btn).toHaveAttribute('aria-disabled', 'true')
+    expect(btn).toHaveAccessibleName(/plays in the 3d factory only/i)
+    await user.click(btn)
+    expect(consent()).toBe(false)
+    expect(btn).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('reflects consent granted elsewhere (Settings) without changing it', () => {

@@ -160,10 +160,11 @@ function useUIEffects(mode: UIMode): void {
     [],
   )
 
-  // Warm panel chunks once the page is idle (after the world in game mode).
+  // Warm panel chunks once the page is idle (after the world in game mode). Once warm, panels
+  // open and switch synchronously (see panels/registry.ts).
   useEffect(() => {
     if (mode === 'game' && status === 'loading') return
-    const t = window.setTimeout(preloadPanels, mode === 'game' ? 1200 : 600)
+    const t = window.setTimeout(() => void preloadPanels(), mode === 'game' ? 1200 : 600)
     return () => window.clearTimeout(t)
   }, [mode, status])
 
@@ -177,8 +178,9 @@ function useUIEffects(mode: UIMode): void {
           const s = useUIStore.getState()
           return { panel: s.panel, dialogue: s.dialogue, prompt: s.prompt, routeTarget: s.routeTarget }
         },
-        toast: (text: string, kind?: 'info' | 'success' | 'warning') => pushToast({ text, kind }),
-        caption: (text: string, kind?: 'sound' | 'pa' | 'info' | 'warning') => pushCaption({ text, kind }),
+        // duration in seconds (optional; default = reading time)
+        toast: (text: string, kind?: 'info' | 'success' | 'warning', duration?: number) => pushToast({ text, kind, duration }),
+        caption: (text: string, kind?: 'sound' | 'pa' | 'info' | 'warning', duration?: number) => pushCaption({ text, kind, duration }),
         forceTouch: (on: boolean | null) => useModality.getState().force(on),
         // Staging helpers for screenshots / e2e (these normally come from other modules).
         setPrompt: (p: { id: string; verb: string; label: string } | null) => useUIStore.getState().setPrompt(p),

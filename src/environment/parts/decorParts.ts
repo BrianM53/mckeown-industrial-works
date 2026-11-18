@@ -659,11 +659,14 @@ export function addProps(ctx: BuildCtx): void {
 
 export function addRestricted(ctx: BuildCtx): void {
   const { b } = ctx
+  // Barrier posts + sagging chains. Thin parts use open, low-segment cylinders:
+  // caps are invisible at this size and the zones carry ~45 posts / spans.
   for (const bar of BARRIERS) {
     for (const [x, z] of bar.posts) {
-      b.cylY('concrete', x, 0, z, 0.2, 0.08, '#A29F94', 8)
-      for (let k = 0; k < 4; k++) b.cylY('paint', x, 0.08 + k * 0.24, z, 0.05, 0.24, k % 2 ? DARK : PALETTE.hazard, 8)
-      b.sphere('paint', x, 1.06, z, 0.07, PALETTE.hazard, 8, 6)
+      b.cylY('concrete', x, 0, z, 0.2, 0.08, '#A29F94', 8, 0.17)
+      b.cylY('paint', x, 0.08, z, 0.05, 0.96, PALETTE.hazard, 6, undefined, true)
+      for (const y of [0.32, 0.72]) b.cylY('paint', x, y, z, 0.055, 0.18, DARK, 6, undefined, true)
+      b.sphere('paint', x, 1.05, z, 0.07, PALETTE.hazard, 6, 4)
     }
     for (const s of bar.spans) {
       const n = 6
@@ -673,7 +676,7 @@ export function addRestricted(ctx: BuildCtx): void {
         const t1 = (k + 1) / n
         const y0 = 0.96 - sag * 4 * t0 * (1 - t0)
         const y1 = 0.96 - sag * 4 * t1 * (1 - t1)
-        b.cylBetween('paint', [s.a[0] + (s.b[0] - s.a[0]) * t0, y0, s.a[1] + (s.b[1] - s.a[1]) * t0], [s.a[0] + (s.b[0] - s.a[0]) * t1, y1, s.a[1] + (s.b[1] - s.a[1]) * t1], 0.028, k % 2 ? DARK : PALETTE.hazard, 5)
+        b.cylBetween('paint', [s.a[0] + (s.b[0] - s.a[0]) * t0, y0, s.a[1] + (s.b[1] - s.a[1]) * t0], [s.a[0] + (s.b[0] - s.a[0]) * t1, y1, s.a[1] + (s.b[1] - s.a[1]) * t1], 0.03, k % 2 ? DARK : PALETTE.hazard, 4, true)
       }
     }
   }

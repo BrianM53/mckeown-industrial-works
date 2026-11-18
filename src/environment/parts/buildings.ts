@@ -151,13 +151,15 @@ function addBuilding(ctx: BuildCtx, bi: BuildingInfo): void {
     fbox(b, 'paint', inf, d0 + 0.08, 0, doorH, 0.16, 0.18, DARK, 0.02)
     fbox(b, 'paint', inf, d1 - 0.08, 0, doorH, 0.16, 0.18, DARK, 0.02)
   } else if (st.door === 'glass') {
-    // canopy + tie rods + downlights, aluminium frame inside the opening
+    // canopy on knee braces (below it, so nothing crosses the sign above) + downlights,
+    // aluminium frame inside the opening
     fbox(b, 'paint', of, dc, doorH + 0.32, 0.2, span + 1.3, 1.55, st.trimColor)
     fbox(b, 'paint', of, dc, doorH + 0.22, 0.32, span + 1.3, 0.08, trimDark, 1.5)
-    for (const a of [d0 - 0.4, d1 + 0.4]) {
-      const [x0, z0] = fp(of, a, 1.45)
-      const [x1, z1] = fp(of, a, 0.02)
-      b.cylBetween('metal', [x0, doorH + 0.5, z0], [x1, doorH + 1.55, z1], 0.03, ALU, 6)
+    for (const a of [d0 - 0.45, d1 + 0.45]) {
+      const [x0, z0] = fp(of, a, 0.04)
+      const [x1, z1] = fp(of, a, 1.2)
+      b.cylBetween('metal', [x0, doorH - 0.72, z0], [x1, doorH + 0.24, z1], 0.035, ALU, 6)
+      fbox(b, 'metal', of, a, doorH - 0.86, 0.26, 0.14, 0.04, ALU)
     }
     for (const a of [dc - span * 0.25, dc + span * 0.25]) {
       const [x, z] = fp(of, a, 0.85)

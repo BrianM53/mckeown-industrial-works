@@ -1,5 +1,6 @@
 import { CONTROLS } from '@/content/controls'
 import { Fragment } from 'react'
+import { Binding } from '../kit/Binding'
 import { Keycap } from '../kit/Keycap'
 import { Panel } from '../kit/Panel'
 import { portfolioHref } from '../lib/links'
@@ -58,7 +59,7 @@ export default function HelpPanel({ onClose }: PanelComponentProps) {
                   {c.keys.map((k, i) => (
                     <Fragment key={k}>
                       {i > 0 && <span className="miw-controls__or"> or </span>}
-                      <Keycap size="sm">{k}</Keycap>
+                      <Binding text={k} />
                     </Fragment>
                   ))}
                 </td>

@@ -7,6 +7,7 @@ import { ENV_PALETTE } from '@/world/palette'
 import { useSettings } from '@/state/settings'
 import { QUALITY, SUN_DIR } from '../config'
 import { applyEnvLighting } from '../lib/envMaterials'
+import { createSkyEnvironment } from '../lib/skyEnvironment'
 import { envLight, sampleLighting } from '../lightState'
 import { EMERGENCY_BEACONS } from './beaconData'
 
@@ -14,15 +15,19 @@ import { EMERGENCY_BEACONS } from './beaconData'
  * Global lighting (environment owns it):
  *  - one shadow-casting sun (WSW, low) whose shadow frustum follows the player
  *    (pushed toward the camera's view direction, texel-snapped => stable shadows)
- *  - hemisphere fill (cool teal-grey sky / warm ground bounce) + subtle ambient
+ *  - image-based sky lighting (generated PMREM -> scene.environment) for the
+ *    cool teal-grey shadow fill and believable steel/glass, plus a hemisphere
+ *    fill (carries the night-shift color shift) and a subtle ambient
  *  - 4 warm point lights (intake, personnel office, maintenance bay, tower plaza)
  *  - 2 red emergency point lights that hop to the beacons nearest the player
  * Night Shift: reads runtime.lighting.level / emergency every frame (owned by the
  * safety module) and scales everything, never below ~15% "moonlit" visibility.
  */
-const SUN_I = 3.1
-const HEMI_I = 1.05
-const AMB_I = 0.22
+const SUN_I = 3.0
+const HEMI_I = 0.6
+const AMB_I = 0.12
+/** scene.environmentIntensity at full lighting level. */
+const ENV_I = 0.78
 const SHADOW_DIST = 90
 
 const C = (hex: string) => new THREE.Color(hex)
@@ -51,6 +56,17 @@ const _up = new THREE.Vector3()
 const _fwd = new THREE.Vector3()
 const _t = new THREE.Vector3()
 
+/** Park a red emergency point light at a beacon, pulsing in step with its rotation. */
+function placeEmergencyLight(light: THREE.PointLight, bc: (typeof EMERGENCY_BEACONS)[number] | undefined, k: number, E: number, reduced: boolean): void {
+  if (!bc) {
+    light.intensity = 0
+    return
+  }
+  light.position.set(bc.x, bc.y - 0.3, bc.z)
+  const pulse = reduced ? 0.75 : 0.45 + 0.55 * Math.max(0, Math.cos(envLight.time * 3.2 + k * 1.7))
+  light.intensity = 42 * E * pulse
+}
+
 export function Lighting({ quality }: { quality: QualityTier }) {
   const cfg = QUALITY[quality]
   const sun = useRef<THREE.DirectionalLight>(null)
@@ -60,6 +76,8 @@ export function Lighting({ quality }: { quality: QualityTier }) {
   const red = useRef<(THREE.PointLight | null)[]>([])
   const target = useMemo(() => new THREE.Object3D(), [])
   const scene = useThree((s) => s.scene)
+  const gl = useThree((s) => s.gl)
+  const envTex = useRef<THREE.Texture | null>(null)
   const reduced = useSettings((s) => s.reducedMotion)
   const reducedRef = useRef(reduced)
   reducedRef.current = reduced
@@ -77,6 +95,30 @@ export function Lighting({ quality }: { quality: QualityTier }) {
       scene.remove(target)
     }
   }, [scene, target])
+
+  // Image-based sky lighting (one small PMREM, generated once per renderer).
+  useEffect(() => {
+    let rt: THREE.WebGLRenderTarget | null = null
+    try {
+      rt = createSkyEnvironment(gl)
+    } catch (err) {
+      console.warn('[environment] sky environment unavailable', err)
+      return
+    }
+    const prev = scene.environment
+    const prevIntensity = scene.environmentIntensity
+    scene.environment = rt.texture
+    scene.environmentIntensity = ENV_I
+    envTex.current = rt.texture
+    return () => {
+      envTex.current = null
+      if (scene.environment === rt!.texture) {
+        scene.environment = prev
+        scene.environmentIntensity = prevIntensity
+      }
+      rt!.dispose()
+    }
+  }, [gl, scene])
 
   // Shadow map setup / quality changes.
   useEffect(() => {
@@ -136,6 +178,7 @@ export function Lighting({ quality }: { quality: QualityTier }) {
       hemi.current.groundColor.lerpColors(HEMI_GROUND_NIGHT, HEMI_GROUND_DAY, L)
     }
     if (amb.current) amb.current.intensity = AMB_I * (0.55 + 0.45 * L)
+    if (envTex.current && scene.environment === envTex.current) scene.environmentIntensity = ENV_I * (0.08 + 0.92 * L)
     for (let i = 0; i < WARM.length; i++) {
       const w = warm.current[i]
       if (w) w.intensity = WARM[i].intensity * L
@@ -167,16 +210,8 @@ export function Lighting({ quality }: { quality: QualityTier }) {
             b1 = i
           }
         }
-        const t = envLight.time
-        const lights = [r0, r1]
-        const ids = [b0, b1]
-        for (let k = 0; k < 2; k++) {
-          const bc = EMERGENCY_BEACONS[ids[k]]
-          if (!bc) continue
-          lights[k].position.set(bc.x, bc.y - 0.3, bc.z)
-          const pulse = reducedRef.current ? 0.75 : 0.45 + 0.55 * Math.max(0, Math.cos(t * 3.2 + k * 1.7))
-          lights[k].intensity = 42 * E * pulse
-        }
+        placeEmergencyLight(r0, EMERGENCY_BEACONS[b0], 0, E, reducedRef.current)
+        placeEmergencyLight(r1, EMERGENCY_BEACONS[b1], 1, E, reducedRef.current)
       }
     }
   })

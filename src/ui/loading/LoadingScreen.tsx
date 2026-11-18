@@ -49,32 +49,37 @@ export function LoadingScreen() {
 
   if (!mounted) return null
   const leaving = status !== 'loading'
+  // Before any module slot has registered (engine + physics chunks still downloading) there is
+  // nothing to count yet: show an indeterminate bar instead of a misleading 0%.
+  const indeterminate = !leaving && total === 0
   const fraction = total > 0 ? Math.min(1, loaded / total) : 0
   const pct = leaving ? 100 : Math.round(fraction * 100)
 
   return (
     <section className={`miw-loading${leaving ? ' is-leaving' : ''}`} aria-label="Loading the factory" data-testid="loading-screen" inert={leaving || undefined}>
       <div className="miw-loading__plate">
-        <p className="miw-loading__kicker">McKeown Industrial Works · Shift start</p>
+        <p className="miw-loading__kicker">
+          <span className="miw-loading__kicker-lead">McKeown Industrial Works · </span>Shift start
+        </p>
         <p className="miw-loading__title">
           <Icon name="factory" size={34} className="miw-loading__gear" />
           <span>Powering up the factory</span>
         </p>
         <div
-          className="miw-loading__bar"
+          className={`miw-loading__bar${indeterminate ? ' is-indeterminate' : ''}`}
           role="progressbar"
           aria-label="Loading the 3D factory"
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={pct}
-          aria-valuetext={total > 0 ? `${loaded} of ${total} systems online` : 'Starting the 3D engine'}
+          aria-valuenow={indeterminate ? undefined : pct}
+          aria-valuetext={total > 0 ? `${Math.min(loaded, total)} of ${total} systems online` : 'Starting the 3D engine'}
         >
-          <span className="miw-loading__fill" style={{ transform: `scaleX(${pct / 100})` }} />
+          <span className="miw-loading__fill" style={indeterminate ? undefined : { transform: `scaleX(${pct / 100})` }} />
           <span className="miw-loading__ticks" aria-hidden="true" />
         </div>
         <p className="miw-loading__count">
           <span>{total > 0 ? `${Math.min(loaded, total)}/${total} systems online` : 'Starting the 3D engine'}</span>
-          <span>{pct}%</span>
+          <span>{indeterminate ? '…' : `${pct}%`}</span>
         </p>
         <p className="miw-loading__line" aria-hidden="true">
           <span className="miw-loading__prompt">&gt;</span> {LOADING_LINES[line]}

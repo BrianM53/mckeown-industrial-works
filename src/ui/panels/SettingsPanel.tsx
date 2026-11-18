@@ -56,6 +56,12 @@ export default function SettingsPanel({ onClose }: PanelComponentProps) {
         </>
       }
     >
+      {mode === 'fallback' && (
+        <p className="miw-callout miw-callout--note" data-testid="settings-fallback-note">
+          The 3D factory isn’t running on this device right now. These preferences are saved in this browser and apply whenever it does.
+          Reduce motion also applies to this page.
+        </p>
+      )}
       <div className="miw-settings">
         <fieldset className="miw-set">
           <legend className="miw-set__legend">
@@ -64,9 +70,17 @@ export default function SettingsPanel({ onClose }: PanelComponentProps) {
           <div className="miw-set__row miw-set__row--consent">
             <div className="miw-set__text">
               <p className="miw-set__label">Sound for this visit</p>
-              <p className="miw-set__desc">{s.audioConsent ? (s.muted ? 'Enabled, currently muted.' : 'Enabled.') : 'Off until you turn it on. Nothing plays automatically.'}</p>
+              <p className="miw-set__desc">
+                {mode === 'fallback'
+                  ? 'Sound plays in the 3D factory only.'
+                  : s.audioConsent
+                    ? s.muted
+                      ? 'Enabled, currently muted.'
+                      : 'Enabled.'
+                    : 'Off until you turn it on. Nothing plays automatically.'}
+              </p>
             </div>
-            {s.audioConsent ? (
+            {mode === 'fallback' ? null : s.audioConsent ? (
               <span className={`miw-set__status${s.muted ? '' : ' is-on'}`}>
                 <span className="miw-led" aria-hidden="true" /> {s.muted ? 'Muted' : 'On'}
               </span>

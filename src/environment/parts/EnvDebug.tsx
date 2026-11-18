@@ -5,14 +5,18 @@ import { registerDebug } from '@/core/debug'
 import { runtime } from '@/core/runtime'
 import { yawFromDirection } from '@/core/math'
 import { environmentColliders } from '../data/colliders'
+import { getLightingOverride, setLightingOverride } from '../lightState'
 import type { BuiltWorld } from './world'
 
 /**
  * Dev/test hooks (stripped in production by registerDebug):
  *   __MIW__.environment.stats()                  -> renderer + environment counts
- *   __MIW__.environment.setLighting(level, em)   -> drive runtime.lighting (night-shift testing)
+ *   __MIW__.environment.breakdown()              -> triangles per environment mesh (largest first)
+ *   __MIW__.environment.setLighting(level, em)   -> force the environment's lighting response (visual-only
+ *                                                   override; runtime.lighting stays owned by safety).
+ *                                                   setLighting(null) clears it. Real blackout: __MIW__.nightShift.start()
  *   __MIW__.environment.interior()               -> current roof-cutaway interior
- *   __MIW__.environment.setPlayer(x, z, yaw?)    -> move the "player" focus when no player module is loaded
+ *   __MIW__.environment.setPlayer(x, z, yaw?)    -> teleport the player (or move the focus when no player module)
  *   __MIW__.envcam.look(px,py,pz, tx,ty,tz)      -> place the default camera (overridden by the player rig)
  */
 export function EnvDebug({ world }: { world: BuiltWorld | null }) {
@@ -53,13 +57,32 @@ export function EnvDebug({ world }: { world: BuiltWorld | null }) {
           steamEmitters: world?.steam.length ?? 0,
         }
       },
-      setLighting: (level: number, emergency = 0) => {
-        runtime.lighting.level = level
-        runtime.lighting.emergency = emergency
-        return { ...runtime.lighting }
+      breakdown: () => {
+        const rows: { name: string; material: string; triangles: number; instances: number; castShadow: boolean; visible: boolean }[] = []
+        scene.getObjectByName('environment-root')?.traverse((o) => {
+          const m = o as THREE.Mesh
+          if (!m.isMesh) return
+          const g = m.geometry as THREE.BufferGeometry
+          const base = g.index ? g.index.count / 3 : (g.getAttribute('position')?.count ?? 0) / 3
+          const im = o as THREE.InstancedMesh
+          const ig = g as THREE.InstancedBufferGeometry
+          const instances = im.isInstancedMesh ? im.count : ig.isInstancedBufferGeometry ? ig.instanceCount : 1
+          const mat = Array.isArray(m.material) ? m.material[0] : m.material
+          rows.push({ name: m.name || m.parent?.name || '?', material: mat?.name ?? '', triangles: Math.round(base * instances), instances, castShadow: m.castShadow, visible: m.visible })
+        })
+        return rows.sort((a, b) => b.triangles - a.triangles)
+      },
+      setLighting: (level: number | null, emergency = 0) => {
+        if (level === null || level === undefined) setLightingOverride(null)
+        else setLightingOverride({ level: Number(level), emergency: Number(emergency) })
+        return getLightingOverride() ?? { ...runtime.lighting }
       },
       interior: () => runtime.world.interior,
       setPlayer: (x: number, z: number, yaw?: number) => {
+        // Prefer the real player (runtime.player is owned by it); fall back for player-less test scenes.
+        const w = window as unknown as { __MIW__?: { player?: { teleport?: (x: number, z: number, yaw?: number) => boolean } } }
+        const teleport = w.__MIW__?.player?.teleport
+        if (typeof teleport === 'function') return teleport(x, z, yaw)
         runtime.player.position.set(x, 0, z)
         if (yaw !== undefined) runtime.camera.yaw = yaw
         return [x, z]
@@ -80,6 +103,7 @@ export function EnvDebug({ world }: { world: BuiltWorld | null }) {
     return () => {
       offEnv()
       offCam()
+      setLightingOverride(null)
     }
   }, [gl, camera, scene, world])
   return null

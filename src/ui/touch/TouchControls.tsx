@@ -203,7 +203,6 @@ function TouchButtons() {
     setRun(next)
   }
   const idle = !prompt && !dialogue
-  const interactLabel = dialogue ? 'Continue dialogue' : prompt ? `${prompt.verb}: ${prompt.label}` : 'Interact (nothing in range)'
 
   return (
     <>
@@ -218,10 +217,11 @@ function TouchButtons() {
           <TouchButton className="miw-tbtn--recenter" icon="recenter" label="Recenter" ariaLabel="Recenter camera" onPress={trigger('recenter')} />
           <TouchButton className="miw-tbtn--run" icon="run" label="Run" pressed={run} onPress={toggleRun} />
         </div>
+        {/* Name comes from the visible text (WCAG 2.5.3 label-in-name), with screen-reader-only joiners:
+            "Inspect: Résumé-O-Matic 3000", "Continue dialogue", "Interact (nothing in range)". */}
         <button
           type="button"
           className={`miw-tbtn miw-tbtn--interact${idle ? ' is-idle' : ''}`}
-          aria-label={interactLabel}
           aria-disabled={idle || undefined}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={onInteract}
@@ -230,7 +230,13 @@ function TouchButtons() {
           <Icon name="hand" size={26} />
           <span className="miw-tbtn__text">
             <span className="miw-tbtn__verb">{dialogue ? 'Continue' : prompt ? prompt.verb : 'Interact'}</span>
-            {!dialogue && prompt && <span className="miw-tbtn__target">{prompt.label}</span>}
+            {dialogue && <span className="sr-only"> dialogue</span>}
+            {!dialogue && prompt && (
+              <>
+                <span className="sr-only">:</span> <span className="miw-tbtn__target">{prompt.label}</span>
+              </>
+            )}
+            {idle && <span className="sr-only"> (nothing in range)</span>}
           </span>
         </button>
       </div>

@@ -108,19 +108,22 @@ export function Panel({ title, kicker, onClose, children, size = 'md', tone = 'p
         onPointerDown={stop}
         onKeyDown={stop}
       >
-        <div className="miw-panel__header">
-          <div className="miw-panel__heading">
-            {kicker && <p className="miw-panel__kicker">{kicker}</p>}
-            <h2 id={titleId} className="miw-panel__title" tabIndex={-1}>
-              {title}
-            </h2>
+        {/* header group: stays pinned when a very short viewport scrolls the whole panel */}
+        <div className="miw-panel__top">
+          <div className="miw-panel__header">
+            <div className="miw-panel__heading">
+              {kicker && <p className="miw-panel__kicker">{kicker}</p>}
+              <h2 id={titleId} className="miw-panel__title" tabIndex={-1}>
+                {title}
+              </h2>
+            </div>
+            <button type="button" className="miw-panel__close" onClick={onClose} aria-label="Close panel" title="Close (Esc)" data-testid="panel-close">
+              <Icon name="close" size={22} />
+            </button>
           </div>
-          <button type="button" className="miw-panel__close" onClick={onClose} aria-label="Close panel" title="Close (Esc)" data-testid="panel-close">
-            <Icon name="close" size={22} />
-          </button>
+          <div className="miw-panel__hazard" aria-hidden="true" />
+          {fiction && <p className="miw-panel__fiction">In-world fiction — not a real claim</p>}
         </div>
-        <div className="miw-panel__hazard" aria-hidden="true" />
-        {fiction && <p className="miw-panel__fiction">In-world fiction — not a real claim</p>}
         <div className="miw-panel__body" role="document" aria-labelledby={titleId} tabIndex={0}>
           {children}
         </div>

@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { ANCHORS, LINES, PAD, RESTRICTED_ZONES, WORLD_BOUNDS, ZONES } from '@/world/layout'
-import { estimateRocketAltitude, PAD_POSITION, PRESS_POSITION, SeededTimer, spaceAt, STEAM_SPOTS, WELD_SPOTS, WORLD_EMITTERS } from './emitters'
+import { ANCHORS, LINES, PAD, QC_ARCH, RESTRICTED_ZONES, WORLD_BOUNDS, ZONES } from '@/world/layout'
+import {
+  estimateRocketAltitude,
+  MarkWatcher,
+  newestItemPast,
+  PAD_POSITION,
+  PRESS_POSITION,
+  QC_MARK,
+  QC_SCANNER_POSITION,
+  SeededTimer,
+  spaceAt,
+  STEAM_SPOTS,
+  WELD_SPOTS,
+  WORLD_EMITTERS,
+} from './emitters'
 import { LOOP_META } from './synth/loops'
 
 describe('world sound map', () => {
@@ -88,6 +101,47 @@ describe('SeededTimer', () => {
     }
     expect(gaps.some((g) => g < 0.6)).toBe(true)
     expect(gaps.some((g) => g > 2.9)).toBe(true)
+  })
+})
+
+describe('QC scanner (payload items passing the arch)', () => {
+  it('the mark is where the payload line crosses the QC arch', () => {
+    const p = LINES.find((l) => l.id === 'payload')!
+    expect(p.zStart + (p.zEnd - p.zStart) * QC_MARK).toBeCloseTo(QC_ARCH.position[1])
+    expect(QC_SCANNER_POSITION[2]).toBe(QC_ARCH.position[1])
+    expect(QC_SCANNER_POSITION[1]).toBeLessThan(QC_ARCH.height)
+  })
+
+  it('newestItemPast returns the cycle id of the newest item beyond the mark', () => {
+    // items sorted descending; item i was made by cycle cycles - (len - 1 - i)
+    expect(newestItemPast([0.9, 0.6, 0.3, 0.1], 20, 0.5)).toBe(18)
+    expect(newestItemPast([0.9, 0.6, 0.3, 0.1], 20, 0.95)).toBe(-1)
+    expect(newestItemPast([], 5, 0.5)).toBe(-1)
+  })
+
+  it('fires once per item passing, never for the initial belt or after a reset', () => {
+    const w = new MarkWatcher(0.5)
+    const items = [0.9, 0.6, 0.45, 0.2]
+    let cycles = 30
+    expect(w.tick(items, cycles)).toBe(false) // first look
+    const fired: number[] = []
+    for (let f = 0; f < 400; f++) {
+      for (let i = 0; i < items.length; i++) items[i] += 0.004
+      while (items.length && items[0] >= 1) items.shift()
+      if (f % 40 === 0) {
+        items.push(0)
+        cycles++
+      }
+      if (w.tick(items, cycles)) fired.push(f)
+    }
+    // every item that crossed 0.5 fired exactly once
+    expect(fired.length).toBeGreaterThanOrEqual(9)
+    for (let i = 1; i < fired.length; i++) expect(fired[i] - fired[i - 1]).toBeGreaterThanOrEqual(30)
+    // hard reset: belt cleared, cycles restart → silent
+    expect(w.tick([], 0)).toBe(false)
+    expect(w.tick([0.1], 1)).toBe(false)
+    expect(w.tick([0.55], 1)).toBe(true)
+    expect(w.tick(undefined, undefined)).toBe(false)
   })
 })
 

@@ -69,6 +69,7 @@ export default function AboutPanel({ onClose }: PanelComponentProps) {
             remote font requests).
           </li>
           <li>All 3D models, textures, sound effects and music are original and generated procedurally in code. No third-party models, images or recordings.</li>
+          <li>Open-source libraries: React, three.js, React Three Fiber, drei and zustand (MIT), and Rapier physics (Apache-2.0).</li>
           <li>Harmony AI and Code Story are named factually; no logos are reproduced.</li>
           <li>The safety inspector is a generic parody character with no government affiliation.</li>
         </ul>

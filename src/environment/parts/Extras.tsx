@@ -179,7 +179,8 @@ export function Flare() {
 }
 
 // ---------------------------------------------------------------------------
-// Transformer hum (positional audio) + occasional spark; steam vent hiss
+// Transformer spark + steam vent hiss. (The transformer HUM is a world emitter
+// of the audio module — see audio/emitters.ts — so it is not started here.)
 // ---------------------------------------------------------------------------
 
 export function AmbientEmitters() {
@@ -191,10 +192,8 @@ export function AmbientEmitters() {
     [],
   )
   useEffect(() => {
-    const hum = audio.loop('transformer-hum', { position: [TRANSFORMER.x, 1.4, TRANSFORMER.z], volume: 0.5, refDistance: 3, maxDistance: 18 })
     const vents = GROUND_VENTS.slice(0, 3).map(([x, z]) => audio.loop('steam-vent', { position: [x, 0.4, z], volume: 0.22, refDistance: 2, maxDistance: 12 }))
     return () => {
-      hum.stop()
       vents.forEach((v) => v.stop())
       mat.dispose()
     }

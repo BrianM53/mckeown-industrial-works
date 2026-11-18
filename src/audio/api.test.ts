@@ -58,6 +58,20 @@ describe('audio api (deferred loop handles)', () => {
     expect(liveLoopCount()).toBe(before)
   })
 
+  it('ignores non-finite volume / rate / position (they never reach the engine, even after a re-bind)', () => {
+    const h = audio.loop('forklift-engine', { position: [1, 0, 1], volume: 0.3, rate: 1.2 })
+    h.setVolume(Number.NaN)
+    h.setRate(Number.POSITIVE_INFINITY)
+    h.setPosition(Number.NaN, 0, 0)
+    const { impl, handles } = fakeImpl()
+    setAudioImpl(impl)
+    expect(handles[0].opts).toMatchObject({ volume: 0.3, rate: 1.2, position: [1, 0, 1] })
+    h.setPosition(2, Number.NaN, 2)
+    h.setVolume(Number.NaN)
+    expect(handles[0].h.calls).toEqual([])
+    h.stop()
+  })
+
   it('never binds a handle that was stopped before the engine started', () => {
     const h = audio.loop('music')
     h.stop()

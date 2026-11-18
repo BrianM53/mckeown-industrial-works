@@ -112,7 +112,7 @@ export const envMats = {
   ground: () =>
     once('ground', () =>
       applyEnvPatch(
-        new THREE.MeshStandardMaterial({ color: '#d9d6cc', map: textures.concrete(), roughness: 0.92, metalness: 0 }),
+        new THREE.MeshStandardMaterial({ color: '#d9d6cc', map: textures.concreteSlab(), roughness: 0.92, metalness: 0 }),
         { macro: 0.13, aoMin: 1, aoHeight: 1, ground: { tileA: 6.5, tileB: 17, joint: 6, jointDark: 0.3, stains: 1, rects: footprintRects(), bounds: boundsVec() } },
         'ground',
       ),
@@ -121,7 +121,7 @@ export const envMats = {
   groundFar: () =>
     once('groundFar', () =>
       applyEnvPatch(
-        new THREE.MeshStandardMaterial({ color: '#b8a587', map: textures.concrete(), roughness: 1, metalness: 0 }),
+        new THREE.MeshStandardMaterial({ color: '#b8a587', map: textures.concreteSlab(), roughness: 1, metalness: 0 }),
         { macro: 0.18, aoMin: 1, aoHeight: 1, ground: { tileA: 9, tileB: 31, stains: 0.6 } },
         'groundFar',
       ),

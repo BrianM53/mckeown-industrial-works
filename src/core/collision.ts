@@ -1,4 +1,11 @@
-import { interactionGroups } from '@react-three/rapier'
+/**
+ * Same bit layout as @react-three/rapier's `interactionGroups` (memberships in the
+ * high 16 bits, filters in the low 16). Inlined so core/ never imports the physics
+ * package (keeps the ~2 MB Rapier chunk out of the lite/no-WebGL entry bundle).
+ */
+const bitmask = (groups: number | number[]): number => [groups].flat().reduce((acc, layer) => acc | (1 << layer), 0)
+export const interactionGroups = (memberships: number | number[], filters?: number | number[]): number =>
+  (bitmask(memberships) << 16) + (filters !== undefined ? bitmask(filters) : 0b1111111111111111)
 
 /**
  * Rapier collision groups. Every collider MUST set `collisionGroups` from

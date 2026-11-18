@@ -49,14 +49,24 @@ export function TopBar({ mode }: { mode: UIMode }) {
   const touch = useIsTouch()
   const navRef = useRef<HTMLElement>(null)
 
-  // Close the narrow-screen menu on any pointer press outside it.
+  // Close the narrow-screen menu on any pointer press outside it, or when keyboard focus moves
+  // to something outside it (Tab past the last item, a panel taking focus). `focusin` rather than
+  // blur: Safari does not focus buttons on tap, so a blur-based close would hide the list mid-tap.
   useEffect(() => {
     if (!menuOpen) return
+    const outside = (t: EventTarget | null) => !!navRef.current && t instanceof Node && !navRef.current.contains(t)
     const onDown = (e: PointerEvent) => {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) setMenuOpen(false)
+      if (outside(e.target)) setMenuOpen(false)
+    }
+    const onFocusIn = (e: FocusEvent) => {
+      if (outside(e.target)) setMenuOpen(false)
     }
     window.addEventListener('pointerdown', onDown, true)
-    return () => window.removeEventListener('pointerdown', onDown, true)
+    document.addEventListener('focusin', onFocusIn)
+    return () => {
+      window.removeEventListener('pointerdown', onDown, true)
+      document.removeEventListener('focusin', onFocusIn)
+    }
   }, [menuOpen, setMenuOpen])
 
   // Never leave the menu hanging open on unmount (e.g. game → fallback switch).
@@ -96,7 +106,20 @@ export function TopBar({ mode }: { mode: UIMode }) {
 
   return (
     <header className="miw-topbar" data-testid="topbar" data-menu-open={menuOpen ? '' : undefined}>
-      <button type="button" className="miw-wordmark" onClick={(e) => openPanelFromControl('about', e)} title="About this site">
+      {mode === 'game' && (
+        // First tab stop on the page: keyboard and screen-reader visitors can leave the 3D view at once.
+        <a className="miw-skiplink" href={portfolioHref()} data-testid="skip-link">
+          Skip the 3D factory: view the portfolio page
+        </a>
+      )}
+      <button
+        type="button"
+        className="miw-wordmark"
+        onClick={(e) => openPanelFromControl('about', e)}
+        title="About this site"
+        aria-haspopup="dialog"
+        data-testid="open-about"
+      >
         <span className="miw-wordmark__logo" aria-hidden="true">
           <Icon name="factory" size={22} />
         </span>
@@ -110,6 +133,7 @@ export function TopBar({ mode }: { mode: UIMode }) {
             </span>
           </span>
         </span>
+        <span className="sr-only"> (about this site)</span>
       </button>
 
       <nav ref={navRef} className="miw-topbar__nav" aria-label="Site">
@@ -127,7 +151,7 @@ export function TopBar({ mode }: { mode: UIMode }) {
         <ul id={LIST_ID} className="miw-topbar__list">
           {NAV_LEAD.map(renderItem)}
           <li>
-            <SoundToggle onToggled={() => setMenuOpen(false)} />
+            <SoundToggle onToggled={() => setMenuOpen(false)} available={mode === 'game'} />
           </li>
           {NAV_TAIL.map(renderItem)}
         </ul>
@@ -152,13 +176,16 @@ export function TopBar({ mode }: { mode: UIMode }) {
 /**
  * Opt-in sound switch. Sound never starts on its own: the first click records
  * consent (settings.audioConsent) and unmutes; later clicks toggle mute.
+ * `available` is false in the HTML fallback (no audio engine runs there): the switch then
+ * stays visible but inert and says why, instead of claiming "On" while nothing can play.
  */
-export function SoundToggle({ onToggled }: { onToggled?: () => void }) {
+export function SoundToggle({ onToggled, available = true }: { onToggled?: () => void; available?: boolean }) {
   const consent = useSettings((s) => s.audioConsent)
   const muted = useSettings((s) => s.muted)
-  const on = consent && !muted
+  const on = available && consent && !muted
 
   const onClick = (e: MouseEvent<HTMLButtonElement>) => {
+    if (!available) return
     const s = useSettings.getState()
     if (!s.audioConsent) s.set({ audioConsent: true, muted: false })
     else s.set({ muted: !s.muted })
@@ -168,17 +195,20 @@ export function SoundToggle({ onToggled }: { onToggled?: () => void }) {
     if (isPointerActivation(e)) focusGame()
   }
 
+  const title = !available ? 'Sound plays in the 3D factory only' : on ? 'Sound is on. Click to mute.' : 'Sound is off. Click to turn it on.'
   return (
     <button
       type="button"
       className={`miw-tb-btn miw-tb-btn--sound${on ? ' is-on' : ''}`}
       aria-pressed={on}
+      aria-disabled={available ? undefined : true}
       onClick={onClick}
-      title={on ? 'Sound is on. Click to mute.' : 'Sound is off. Click to turn it on.'}
+      title={title}
       data-testid="sound-toggle"
     >
       <Icon name={on ? 'sound-on' : 'sound-off'} />
       <span className="miw-tb-btn__label">Sound</span>
+      {!available && <span className="sr-only"> (plays in the 3D factory only)</span>}
       <span className="miw-tb-btn__state" aria-hidden="true">
         <span className="miw-led" />
         {on ? 'On' : 'Off'}

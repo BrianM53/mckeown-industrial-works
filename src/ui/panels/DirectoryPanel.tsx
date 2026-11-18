@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { getService } from '@/core/services'
+import { useSettings } from '@/state/settings'
 import { useUIStore } from '@/state/ui'
 import type { ZoneId } from '@/world/layout'
 import { Icon } from '../kit/Icon'
@@ -7,6 +8,7 @@ import { Panel } from '../kit/Panel'
 import { DESTINATIONS, type Destination } from '../lib/destinations'
 import { openPanelFromControl } from '../lib/nav'
 import { useUIMode } from '../lib/mode'
+import { usePoll } from '../lib/usePoll'
 import { SiteMap } from './SiteMap'
 import type { PanelComponentProps } from './registry'
 
@@ -21,12 +23,14 @@ export default function DirectoryPanel({ onClose }: PanelComponentProps) {
   const game = mode === 'game'
   const routeTarget = useUIStore((s) => s.routeTarget) as ZoneId | null
   const [highlight, setHighlight] = useState<string | null>(null)
-  const [canTravel] = useState(() => getService('player') !== undefined)
+  // The player service appears once the 3D world has loaded (the directory also works before that).
+  const canTravel = usePoll(() => getService('player') !== undefined, 2, game)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const entries = game ? DESTINATIONS : DESTINATIONS.filter((d) => d.panel !== null)
+  const entries = useMemo(() => (game ? DESTINATIONS : DESTINATIONS.filter((d) => d.panel !== null)), [game])
   const principal = entries.filter((d) => d.principal)
   const more = entries.filter((d) => !d.principal)
+  const selectable = useMemo(() => new Set<ZoneId>(entries.map((d) => d.zoneId)), [entries])
 
   useEffect(() => {
     if (!highlight) return
@@ -52,7 +56,7 @@ export default function DirectoryPanel({ onClose }: PanelComponentProps) {
     if (!d) return
     setHighlight(d.key)
     const el = listRef.current?.querySelector<HTMLElement>(`[data-dest="${d.key}"]`)
-    el?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+    el?.scrollIntoView?.({ block: 'nearest', behavior: useSettings.getState().reducedMotion ? 'auto' : 'smooth' })
   }
 
   const renderEntry = (d: Destination, index: number | null) => {
@@ -123,7 +127,13 @@ export default function DirectoryPanel({ onClose }: PanelComponentProps) {
           )}
         </div>
         <div className="miw-dir__map">
-          <SiteMap showPlayer={game} routeTarget={game ? routeTarget : null} highlight={highlight ? (entries.find((d) => d.key === highlight)?.zoneId ?? null) : null} onSelectZone={selectZone} />
+          <SiteMap
+            showPlayer={game}
+            routeTarget={game ? routeTarget : null}
+            highlight={highlight ? (entries.find((d) => d.key === highlight)?.zoneId ?? null) : null}
+            onSelectZone={selectZone}
+            selectable={selectable}
+          />
           {game && routeTarget && (
             <button type="button" className="miw-btn miw-btn--sm miw-dir__clear" onClick={() => useUIStore.getState().setRouteTarget(null)}>
               <Icon name="close" size={16} /> Clear route

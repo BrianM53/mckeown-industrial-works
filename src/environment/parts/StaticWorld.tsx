@@ -24,6 +24,7 @@ export function StaticMeshes({ world, sign, poster, shadows }: { world: BuiltWor
       {world.statics.map((s) => (
         <mesh
           key={s.key}
+          name={`env-static:${s.key}`}
           geometry={s.geometry}
           material={staticMaterial(s.key, sign, poster)}
           castShadow={shadows && !!CASTS[s.key]}
@@ -89,6 +90,7 @@ export function Roofs({ world, shadows }: { world: BuiltWorld; shadows: boolean 
         r.parts.map((p, i) => (
           <mesh
             key={`${r.id}:${p.key}`}
+            name={`env-roof:${r.id}:${p.key}`}
             geometry={p.geometry}
             material={mats.get(r.id)![i]}
             castShadow={shadows && (p.key === 'corr' || p.key === 'paint' || p.key === 'brick')}

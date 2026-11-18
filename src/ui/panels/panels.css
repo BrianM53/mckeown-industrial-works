@@ -450,6 +450,8 @@
 /* ---------- contact ---------- */
 .miw-contact-list {
   display: grid;
+  /* minmax(0, 1fr): a long destination URL must ellipsize, not widen the track past the panel */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   margin: 14px 0 16px;
   padding: 0;
@@ -680,6 +682,53 @@
   }
   .miw-dir__map {
     position: static;
+  }
+}
+/* very short viewports scroll the whole panel (kit/panel.css): a sticky map would slide under the pinned header */
+@media (max-height: 420px) {
+  .miw-dir__map {
+    position: static;
+  }
+}
+/* phones: chip beside the name, actions as one row of equal control buttons (icon over label) */
+@media (max-width: 560px) {
+  .miw-dest {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 10px;
+  }
+  .miw-dest__main {
+    display: contents;
+  }
+  .miw-dest__name {
+    margin: 0;
+  }
+  .miw-dest__blurb,
+  .miw-dest__actions {
+    grid-column: 1 / -1;
+  }
+  .miw-dest__blurb {
+    margin: 8px 0 10px;
+  }
+  .miw-dest__actions {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: 6px;
+  }
+  .miw-dest__actions .miw-btn {
+    flex-direction: column;
+    gap: 4px;
+    min-height: 56px;
+    padding: 6px 4px;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+  }
+  .miw-dest__actions .miw-btn:only-child {
+    flex-direction: row;
+    gap: 8px;
+    min-height: var(--tap);
   }
 }
 
@@ -1322,6 +1371,9 @@ p.miw-set__label {
 .miw-ql--small {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.miw-ql--small.miw-ql--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .miw-ql__tile {
   display: flex;
   align-items: center;
@@ -1403,6 +1455,13 @@ p.miw-set__label {
   }
   .miw-ql--small {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .miw-ql--small.miw-ql--three {
+    grid-template-columns: 1fr;
+  }
+  .miw-ql--three .miw-ql__tile--small {
+    flex-direction: row;
+    align-items: center;
   }
 }
 

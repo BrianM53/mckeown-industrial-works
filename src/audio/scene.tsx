@@ -2,18 +2,22 @@ import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Quaternion, Vector3 } from 'three'
 import { registerDebug } from '@/core/debug'
+import { events, type GameEventName, type GameEvents } from '@/core/events'
 import { damp } from '@/core/math'
 import { runtime } from '@/core/runtime'
 import type { LineId, SfxName, Vec3 } from '@/core/types'
 import { useGameStore } from '@/state/game'
 import { useUIStore, type PanelState } from '@/state/ui'
-import { factory } from '@/systems/factory'
+import { factory, WORLD } from '@/systems/factory'
 import { audio, liveLoopCount, type LoopHandle, type PlayOptions } from './api'
 import {
   estimateRocketAltitude,
+  MarkWatcher,
   PAD_POSITION,
   PIPE_MACHINE_POSITION,
   PRESS_POSITION,
+  QC_MARK,
+  QC_SCANNER_POSITION,
   SeededTimer,
   STEAM_SPOTS,
   WELD_SPOTS,
@@ -41,8 +45,11 @@ const _up = new Vector3()
 interface WorldHandle {
   def: WorldEmitterDef
   handle: LoopHandle
+  /** Last volume / rate sent to the handle. */
   volume: number
   rate: number
+  /** Smoothed 0..1 "the belt is moving" (belts only). */
+  activity: number
 }
 
 /** Rocket flight: a positional rumble that climbs with the (estimated) rocket. */
@@ -92,7 +99,10 @@ class FlightSound {
   }
 }
 
-/** Machinery one-shots synced to the factory sim + seeded ambient bursts. */
+/** Below this machinery power (Night Shift) the factory's one-shot machines fall silent. */
+const MACHINE_POWER = 0.35
+
+/** Machinery one-shots synced to the factory sim + seeded ambient bursts + belt motion. */
 class WorldMachines {
   world: WorldHandle[] = []
   private prevSmelt = Number.NaN
@@ -100,52 +110,74 @@ class WorldMachines {
   private acc = 0
   private readonly weld = new SeededTimer('audio:weld', 2.5, 7, { chance: 0.6, min: 0.25, max: 0.9 })
   private readonly steam = STEAM_SPOTS.map((_, i) => new SeededTimer(`audio:steam:${i}`, 7, 18))
+  private readonly qc = new MarkWatcher(QC_MARK)
 
   tick(dt: number, power: number): void {
     const lines = factory?.state?.lines
+    const powered = power > MACHINE_POWER
+    // the stamping press slams when the smelt cycle crosses 0.5 (production animates the same phase)
     const smelt = lines?.smelt
     if (smelt && Number.isFinite(smelt.phase)) {
-      if (smelt.status === 'running' && power > 0.35 && phaseCrossed(this.prevSmelt, smelt.phase, 0.5)) {
+      if (smelt.status === 'running' && powered && phaseCrossed(this.prevSmelt, smelt.phase, 0.5)) {
         audio.play('press-thump', { position: PRESS_POSITION })
       }
       this.prevSmelt = smelt.phase
     }
     const pipe = lines?.pipe
     if (pipe && Number.isFinite(pipe.phase)) {
-      if (pipe.status === 'running' && power > 0.35 && phaseCrossed(this.prevPipe, pipe.phase, 0.3)) {
+      if (pipe.status === 'running' && powered && phaseCrossed(this.prevPipe, pipe.phase, 0.3)) {
         audio.play('machine-clank', { position: PIPE_MACHINE_POSITION, volume: 0.4 })
       }
       this.prevPipe = pipe.phase
     }
-    if (this.weld.tick(dt) && (lines?.tank?.status ?? 'running') === 'running' && power > 0.35) {
+    if (this.weld.tick(dt) && (lines?.tank?.status ?? 'running') === 'running' && powered) {
       audio.play('weld-zap', { position: WELD_SPOTS[this.weld.next() < 0.5 ? 0 : 1] })
     }
     for (let i = 0; i < this.steam.length; i++) {
       if (this.steam[i].tick(dt) && power > 0.3) audio.play('steam-hiss', { position: STEAM_SPOTS[i], volume: 0.75 })
     }
+    // QC arch: a soft two-tone beep as each payload item passes the scanner
+    const payload = lines?.payload
+    if (this.qc.tick(payload?.items, payload?.cycles) && powered) {
+      audio.play('scanner-beep', { position: QC_SCANNER_POSITION, volume: 0.55 })
+    }
 
-    // belts follow line status and conveyor speed (5 Hz is plenty)
+    // belts follow the sim's real belt motion (10 Hz is plenty)
     this.acc += dt
-    if (this.acc < 0.2) return
+    if (this.acc < 0.1) return
+    const step = Math.min(this.acc, 0.5)
     this.acc = 0
-    const speed = factory?.state?.params?.conveyorSpeed
-    const conveyor = Number.isFinite(speed) ? (speed as number) : 1
+    let anyMoving = false
+    if (lines) {
+      for (const id of BELT_LINES) {
+        if ((lines[id]?.beltSpeed ?? 0) > 1e-5) anyMoving = true
+      }
+    } else anyMoving = true
+    const conveyor = factory?.state?.params?.conveyorSpeed
+    const nominal = Number.isFinite(conveyor) ? (conveyor as number) : 1
     for (const w of this.world) {
       if (w.def.loop !== 'belt-clatter') continue
-      const st = w.def.line ? lines?.[w.def.line as LineId]?.status : 'running'
-      const vol = st === 'idle' ? 0 : st === 'blocked' ? w.def.volume * 0.25 : w.def.volume
-      const rate = st === 'blocked' ? conveyor * 0.5 : conveyor
-      if (vol !== w.volume) {
+      const st = w.def.line && lines ? lines[w.def.line] : undefined
+      const speed = st ? st.beltSpeed : Number.NaN
+      const moving = st ? speed > 1e-5 : anyMoving
+      // belt lengths/s → conveyor multiplier (keep the last pitch while stopped so a restart sounds continuous)
+      const rate = st ? (moving ? speed * WORLD.beltTransitSeconds[st.id] : w.rate) : nominal
+      w.activity = damp(w.activity, moving ? 1 : 0, moving ? 3 : 1.6, step)
+      if (!moving && w.activity < 0.02) w.activity = 0
+      const vol = w.def.volume * w.activity
+      if (Math.abs(vol - w.volume) > 0.01 || (vol === 0 && w.volume !== 0)) {
         w.volume = vol
         w.handle.setVolume(vol)
       }
-      if (Math.abs(rate - w.rate) > 0.01) {
+      if (Number.isFinite(rate) && Math.abs(rate - w.rate) > 0.01) {
         w.rate = rate
         w.handle.setRate(rate)
       }
     }
   }
 }
+
+const BELT_LINES: LineId[] = ['smelt', 'pipe', 'circuit', 'tank']
 
 /** World attenuation while a panel is open; the settings panel stays true so sliders can be judged. */
 function panelFocus(panel: PanelState | null): number {
@@ -167,8 +199,9 @@ export default function AudioScene() {
   // Engine lifecycle (refcounted) + render quality → panning model / voice caps
   // + panel focus (the world is lowered ~4 dB while a portfolio panel is open).
   useEffect(() => {
-    const release = engine.acquire()
+    // quality first: a context created right away (consent already given) picks its reverb by tier
     engine.setQuality(useGameStore.getState().quality)
+    const release = engine.acquire()
     engine.setFocus(panelFocus(useUIStore.getState().panel))
     const unsubQ = useGameStore.subscribe((s) => engine.setQuality(s.quality))
     const unsubP = useUIStore.subscribe((s) => engine.setFocus(panelFocus(s.panel)))
@@ -183,12 +216,18 @@ export default function AudioScene() {
   // Continuous world emitters + soundtrack + ambience bed.
   useEffect(() => {
     const m = machines.current
-    m.world = WORLD_EMITTERS.map((def) => ({
-      def,
-      volume: def.volume,
-      rate: 1,
-      handle: audio.loop(def.loop, { position: def.position, volume: def.volume, refDistance: def.refDistance, maxDistance: def.maxDistance }),
-    }))
+    m.world = WORLD_EMITTERS.map((def) => {
+      const belt = def.loop === 'belt-clatter'
+      // belts start silent and fade in once the sim reports motion (no burst at load)
+      const volume = belt ? 0 : def.volume
+      return {
+        def,
+        volume,
+        rate: 1,
+        activity: 0,
+        handle: audio.loop(def.loop, { position: def.position, volume, refDistance: def.refDistance, maxDistance: def.maxDistance }),
+      }
+    })
     const music = audio.loop('music')
     const bed = audio.loop('ambience-factory')
     const fl = flight.current
@@ -204,7 +243,7 @@ export default function AudioScene() {
   // Game events → sounds. (Event owners emit the captions.)
   useEffect(() => wireAudioEvents({ play, duck: (a, sec) => audio.duck(a, sec), flight: flight.current }), [])
 
-  // Debug / test hooks (dev + test builds only).
+  // Debug / test hooks (dev + test builds only; registerDebug is a no-op in production).
   useEffect(
     () =>
       registerDebug('audio', {
@@ -213,6 +252,8 @@ export default function AudioScene() {
         enableForTest: () => engine.enableForTest(),
         play: (name: SfxName, opts?: PlayOptions) => audio.play(name, opts),
         duck: (amount: number, seconds: number) => audio.duck(amount, seconds),
+        /** Emit a game event as its owner would (drives the event → sound wiring from tests). */
+        emit: <K extends GameEventName>(name: K, payload: GameEvents[K]) => events.emit(name, payload),
         setListenerOverride: (p: Vec3 | null) => engine.setListenerOverride(p),
         liveHandles: () => liveLoopCount(),
         perf: () => engine.takePerf(),

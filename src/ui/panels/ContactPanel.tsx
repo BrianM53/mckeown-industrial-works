@@ -2,7 +2,7 @@ import { contactOptions } from '@/content/links'
 import { PROFILE } from '@/content/profile'
 import { Icon } from '../kit/Icon'
 import { Panel } from '../kit/Panel'
-import { hostLabel } from '../lib/links'
+import { displayUrl } from '../lib/links'
 import { CONTACT_ICON, CONTACT_KIND_LABEL, ContactLink, PanelLink } from './common'
 import type { PanelComponentProps } from './registry'
 
@@ -28,20 +28,23 @@ export default function ContactPanel({ onClose }: PanelComponentProps) {
     >
       <p className="miw-lede">The best ways to reach {PROFILE.name}:</p>
       <ul className="miw-contact-list">
-        {options.map((o) => (
-          <li key={o.kind}>
-            <ContactLink option={o} className="miw-contact-card">
-              <span className="miw-contact-card__icon" aria-hidden="true">
-                <Icon name={CONTACT_ICON[o.kind]} size={22} />
-              </span>
-              <span className="miw-contact-card__text">
-                <span className="miw-contact-card__kind">{CONTACT_KIND_LABEL[o.kind]}</span>
-                <span className="miw-contact-card__label">{o.label}</span>
-                {o.kind !== 'email' && <span className="miw-contact-card__host">{hostLabel(o.href)}</span>}
-              </span>
-            </ContactLink>
-          </li>
-        ))}
+        {options.map((o) => {
+          const where = o.kind === 'email' ? null : displayUrl(o.href)
+          return (
+            <li key={o.kind}>
+              <ContactLink option={o} className="miw-contact-card">
+                <span className="miw-contact-card__icon" aria-hidden="true">
+                  <Icon name={CONTACT_ICON[o.kind]} size={22} />
+                </span>
+                <span className="miw-contact-card__text">
+                  <span className="miw-contact-card__kind">{CONTACT_KIND_LABEL[o.kind]}</span>
+                  <span className="miw-contact-card__label">{o.label}</span>
+                  {where && where !== o.label && <span className="miw-contact-card__host">{where}</span>}
+                </span>
+              </ContactLink>
+            </li>
+          )
+        })}
       </ul>
       {!PROFILE.email && PROFILE.linkedin?.verified && (
         <p className="miw-contact-note">

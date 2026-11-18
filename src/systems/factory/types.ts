@@ -43,13 +43,23 @@ export interface LineState {
   phase: number
   /** Completed machine cycles (monotonic). */
   cycles: number
-  /** Visible belt items as normalized positions 0..1 from zStart (0) to zEnd (1). Deterministic. */
+  /**
+   * Visible belt items as normalized positions 0..1 from zStart (0) to zEnd (1). Deterministic.
+   * Sorted DESCENDING (index 0 is nearest the tower); item i was made by machine cycle
+   * `cycles - (items.length - 1 - i)` (use it for stable per-item variety).
+   */
   items: number[]
   /** Parts delivered to the tower for the current rocket. */
   delivered: number
   /** Parts required from this line for the current rocket. */
   required: number
+  /**
+   * 'blocked' = backed up to the machine: the tower hopper for this line is full and the belt
+   * is packed, so the machine waits (rate 0, phase holds at 0). The sim never emits 'idle'.
+   */
   status: 'running' | 'blocked' | 'idle'
+  /** Belt surface speed in normalized belt lengths per second (0 while the belt is stopped). */
+  beltSpeed: number
   /** Seconds remaining of a QC "defect caught" flash (0 when none). */
   defectFlash: number
 }
@@ -118,7 +128,10 @@ export interface FactorySim {
   stop(): void
   /** Live state (mutated in place every tick). Read only — never write. */
   readonly state: FactoryState
-  /** Notified on low-frequency changes: phase/stage changes, counters, params, countdown seconds. */
+  /**
+   * Notified on low-frequency changes: phase/stage changes, counters, params, countdown seconds.
+   * React: `useFactory(selector, isEqual?)` re-renders only when the selected value changes.
+   */
   subscribe(fn: () => void): () => void
   /** Monotonic version number bumped on every notify (for useSyncExternalStore). */
   readonly version: number

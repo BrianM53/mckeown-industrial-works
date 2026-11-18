@@ -16,7 +16,7 @@ const UNLOCK_GRACE_MS = 300
  *   M  toggle directory      P  toggle quick links      ?  toggle help
  *   Esc  close menu → close panel (if focus is outside it; the Panel handles its own)
  *        → close dialogue → (game mode, pointer not locked) open quick links as a pause menu
- *   E / Space  advance the dialogue bubble while it is open
+ *   E / Space  advance the dialogue bubble while it is open (consumed: never reaches game handlers)
  * Also registers the 'map' | 'menu' | 'quicklinks' | 'help' actions for touch buttons.
  */
 export function useUIKeyboard(mode: UIMode): void {
@@ -70,7 +70,11 @@ export function useUIKeyboard(mode: UIMode): void {
         const isE = key === 'e' || key === 'E'
         const isSpace = key === ' ' && !isActivatable(e.target)
         if (isE || isSpace) {
+          // The dialogue owns this key press. Stop it here (window, capture phase) so it never
+          // reaches the player's E handler: advancing past the last line closes the bubble, and
+          // the same keydown would otherwise re-interact and reopen the conversation at once.
           e.preventDefault()
+          e.stopPropagation()
           if (e.repeat || now() - dialogueOpenedAt < DIALOGUE_GRACE_MS) return
           ui.advanceDialogue()
           return

@@ -184,6 +184,13 @@ describe('buffers and mixer', () => {
       expect(Math.sqrt(sum / d.length)).toBeCloseTo(0.25, 1)
     }
     expect(noiseBank(asCtx(ctx)).pink).toBe(bank.pink)
+    // no DC in any noise colour (loops built from them must not carry an offset)
+    for (const k of ['white', 'pink', 'brown', 'crackle'] as const) {
+      const d = bank[k].getChannelData(0)
+      let mean = 0
+      for (let i = 0; i < d.length; i++) mean += d[i]
+      expect(Math.abs(mean / d.length), k).toBeLessThan(1e-3)
+    }
     const brown = bank.brown.getChannelData(0)
     expect(Math.abs(brown[brown.length - 1] - brown[0])).toBeLessThan(0.1)
     const seam = makeLoopable(Float32Array.from({ length: 200 }, (_, i) => i), 100, 50)

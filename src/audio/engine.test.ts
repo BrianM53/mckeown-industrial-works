@@ -165,6 +165,77 @@ describe('consent gating', () => {
   })
 })
 
+describe('context start-up (Firefox / Safari start the context asynchronously)', () => {
+  /** A context whose resume() is accepted but takes effect only when the test says so. */
+  function slowStart() {
+    const created: FakeAudioContext[] = []
+    const create = () => {
+      const c = new FakeAudioContext()
+      c.resume = () => {
+        c.resumeCalls++
+        return Promise.resolve()
+      }
+      created.push(c)
+      return asCtx(c)
+    }
+    return { created, create }
+  }
+
+  it("the Sound button's own click is scheduled while the context is still starting", () => {
+    const slow = slowStart()
+    const { eng, consent, clock } = track(setup({ create: slow.create }))
+    eng.acquire()
+    consent()
+    const ctx = slow.created[0]
+    expect(ctx.state).toBe('suspended')
+    expect(ctx.resumeCalls).toBeGreaterThan(0)
+    eng.api.play('ui-click')
+    expect(eng.getState().activeVoices).toBe(1)
+    clock.t += 0.2
+    ctx.state = 'running'
+    eng.update(0.016)
+    expect(eng.getState().activeVoices).toBe(1)
+    expect(eng.getState().lastPlayed).toEqual(['ui-click'])
+  })
+
+  it('sounds are not queued on a context that will not start, and stale ones never play late', () => {
+    const slow = slowStart()
+    const { eng, consent, clock } = track(setup({ create: slow.create }))
+    eng.acquire()
+    consent()
+    const ctx = slow.created[0]
+    eng.api.play('ui-click')
+    clock.t += 1
+    eng.api.play('boing')
+    expect(eng.getState().activeVoices).toBe(1)
+    // much later a gesture finally starts the context: the old click is dropped, not played
+    clock.t += 5
+    ctx.state = 'running'
+    eng.update(0.016)
+    expect(eng.getState().activeVoices).toBe(0)
+    expect(eng.getState().dropped.stolen).toBe(0)
+    eng.api.play('boing')
+    expect(eng.getState().activeVoices).toBe(1)
+  })
+
+  it('a loop moved while suspended is placed immediately (correct on resume)', () => {
+    const { eng, consent, settings, created } = track(setup())
+    eng.acquire()
+    consent()
+    warmUp()
+    eng.setListenerOverride([0, 1, 0])
+    const h = eng.api.loop('forklift-engine', { position: [2, 1, 0] })
+    eng.update(0.11)
+    settings.getState().set({ muted: true })
+    vi.advanceTimersByTime(300)
+    expect(created[0].state).toBe('suspended')
+    h.setPosition(5, 1, -3)
+    const panner = created[0].allNodes.find((n) => n.kind === 'panner') as unknown as { positionX: FakeParam; positionZ: FakeParam }
+    expect(panner.positionX.value).toBe(5)
+    expect(panner.positionZ.value).toBe(-3)
+  })
+})
+
 describe('lifecycle (StrictMode-safe)', () => {
   it('mount → unmount → mount reuses one context; a real unmount closes it', () => {
     const { eng, createContext, created, consent, settings, doc } = track(setup())
@@ -198,6 +269,7 @@ describe('lifecycle (StrictMode-safe)', () => {
     eng.api.loop('music')
     eng.api.loop('furnace-roar', { position: [0, 2.5, 30] })
     eng.api.play('press-thump')
+    eng.update(0.016)
     expect(eng.getState().activeLoops).toBe(2)
     release()
     vi.advanceTimersByTime(100)
@@ -344,6 +416,18 @@ describe('voices', () => {
     expect(eng.getState().activeVoices).toBe(16)
   })
 
+  it('rate limits are per source for positional sounds', () => {
+    const { eng, consent } = track(setup())
+    eng.acquire()
+    consent()
+    eng.setListenerOverride([0, 1.6, 0])
+    eng.api.play('crate-bump', { position: [2, 0.5, 0] })
+    eng.api.play('crate-bump', { position: [2.2, 0.5, 0.1] })
+    eng.api.play('crate-bump', { position: [-6, 0.5, 0] })
+    expect(eng.getState().activeVoices).toBe(2)
+    expect(eng.getState().dropped.rateLimited).toBe(1)
+  })
+
   it('rate-limits per name (footsteps ≥ 0.18 s apart)', () => {
     const { eng, consent, clock } = track(setup())
     eng.acquire()
@@ -417,10 +501,47 @@ describe('loops and spatial culling', () => {
     consent()
     warmUp()
     eng.setListenerOverride([0, 1, 0])
-    for (let i = 0; i < 6; i++) eng.api.loop('belt-clatter', { position: [i * 3, 1, 0] })
+    for (let i = 0; i < 6; i++) eng.api.loop('belt-clatter', { position: [i * 4, 1, 0] })
+    // realization is budgeted (2 per tick): let a few ticks run
+    for (let i = 0; i < 4; i++) eng.update(0.11)
     const loops = eng.getLoops()
     expect(loops.filter((l) => l.active).length).toBe(3)
-    expect(loops.filter((l) => l.active).map((l) => l.position![0])).toEqual([0, 3, 6])
+    expect(loops.filter((l) => l.active).map((l) => l.position![0])).toEqual([0, 4, 8])
+  })
+
+  it('two modules placing the same hum on the same machine never stack (loudest twin plays)', () => {
+    const { eng, consent } = track(setup())
+    eng.acquire()
+    consent()
+    warmUp()
+    eng.setListenerOverride([17, 1.6, 0])
+    const mine = eng.api.loop('transformer-hum', { position: [17.5, 1.5, -4.5], volume: 1 })
+    eng.api.loop('transformer-hum', { position: [17.6, 1.4, -4.6], volume: 0.5 })
+    for (let i = 0; i < 3; i++) eng.update(0.11)
+    const active = eng.getLoops().filter((l) => l.active)
+    expect(active).toHaveLength(1)
+    expect(active[0].volume).toBe(1)
+    // when the louder twin goes away, the other one takes over
+    mine.stop()
+    for (let i = 0; i < 3; i++) eng.update(0.11)
+    expect(eng.getLoops().filter((l) => l.active).map((l) => l.volume)).toEqual([0.5])
+  })
+
+  it('a burst of new loops is realized a couple per tick (no single-frame spike)', () => {
+    const { eng, consent } = track(setup())
+    eng.acquire()
+    consent()
+    warmUp()
+    eng.setListenerOverride([0, 1, 0])
+    const names = ['furnace-roar', 'fan-hum', 'server-hum', 'transformer-hum', 'steam-vent', 'radio-music'] as const
+    names.forEach((n, i) => eng.api.loop(n, { position: [i * 5 - 12, 1, 3] }))
+    expect(eng.getState().activeLoops).toBe(0)
+    eng.update(0.016)
+    expect(eng.getState().activeLoops).toBe(2)
+    eng.update(0.11)
+    expect(eng.getState().activeLoops).toBe(4)
+    eng.update(0.11)
+    expect(eng.getState().activeLoops).toBe(6)
   })
 
   it('non-positional loops (music, ambience) start with consent', () => {

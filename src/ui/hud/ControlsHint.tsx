@@ -3,6 +3,7 @@ import { SPAWN_HINT } from '@/content/controls'
 import { runtime } from '@/core/runtime'
 import { useGameStore } from '@/state/game'
 import { useUIStore } from '@/state/ui'
+import { Binding } from '../kit/Binding'
 import { Keycap } from '../kit/Keycap'
 import { useIsTouch } from '../lib/modality'
 
@@ -13,7 +14,8 @@ const POLL_MS = 250
 
 /**
  * Brief, non-blocking controls hint shown once the world is ready. Hides after
- * ~9 s of visible time or once the worker has walked (speed > 0.5) for ~1 s.
+ * ~9 s of visible time, once the worker has walked (speed > 0.5) for ~1 s, or
+ * when a dialogue opens. The clock pauses while a panel is open.
  * Respects ui store controlsHintVisible (other modules may hide it).
  */
 export function ControlsHint() {
@@ -29,6 +31,11 @@ export function ControlsHint() {
     let moving = 0
     const id = window.setInterval(() => {
       const ui = useUIStore.getState()
+      // Talking to a worker means the controls have landed; the bubble also needs the space.
+      if (ui.dialogue) {
+        ui.setControlsHintVisible(false)
+        return
+      }
       if (ui.panel) return // reading a panel: pause the clock
       shown += POLL_MS / 1000
       moving = runtime.player.speed > 0.5 ? moving + POLL_MS / 1000 : 0
@@ -68,7 +75,7 @@ export function ControlsHint() {
   )
 }
 
-/** "W A S D to walk · Shift to run" → keycaps for the inputs, plain text for the rest. */
+/** "W A S D to walk · Shift to run" → keycaps for keys, flat chips for mouse gestures, plain text for the rest. */
 export function formatHintLine(line: string): ReactNode[] {
   return line.split(' · ').map((seg, i) => {
     const m = /^(.+?) (to|for) (.+)$/.exec(seg)
@@ -77,7 +84,7 @@ export function formatHintLine(line: string): ReactNode[] {
         {i > 0 && <span className="miw-hint__dot" aria-hidden="true"> · </span>}
         {m ? (
           <>
-            <Keycap size="sm">{m[1]}</Keycap> {m[2]} {m[3]}
+            <Binding text={m[1]} /> {m[2]} {m[3]}
           </>
         ) : (
           seg

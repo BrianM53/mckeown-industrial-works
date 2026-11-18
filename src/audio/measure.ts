@@ -1,6 +1,6 @@
 import { createRng } from '@/core/rng'
 import type { LoopName, SfxName } from '@/core/types'
-import { gainToDb, OCC_NONE, volumeToGain } from './logic'
+import { crowdGain, crowdWeight, gainToDb, OCC_NONE, voiceLoudness, volumeToGain } from './logic'
 import { createMixer, MIX, type Mixer } from './mixer'
 import { Synth } from './synth/core'
 import { LOOP_META, LOOP_NAMES } from './synth/loops'
@@ -211,11 +211,20 @@ const STRESS: SfxName[] = [
   'steam-hiss',
 ]
 
-/** Worst case: 24 loud one-shots at once, every slider at max, no voice caps / crowd gain. */
-export async function measureStress(): Promise<{ voices: number; preLimiterPeakDb: number; peakDb: number }> {
-  const render = async (dynamics: boolean) => {
+/**
+ * Worst case: 24 loud one-shots within 0.1 s, every slider at max, all at
+ * the listener. `preLimiterPeakDb` / `peakDb`: no voice caps and no crowd gain
+ * (pessimistic). `enginePeakDb`: with the crowd normalization the engine applies
+ * to the one-shot bus (what a visitor could actually hear). Both must stay < 0 dBFS.
+ */
+export async function measureStress(): Promise<{ voices: number; preLimiterPeakDb: number; peakDb: number; crowdGainDb: number; enginePeakDb: number }> {
+  let crowd = 0
+  for (const name of STRESS) crowd += crowdWeight(voiceLoudness(SFX_META[name].peakDb, 1, 1, 1))
+  const shots = crowdGain(crowd)
+  const render = async (dynamics: boolean, shotsGain: number) => {
     const oc = new (Offline())(2, Math.ceil(SR * (T0 + 7.5)), SR)
     const mx = defaultMixer(oc, { master: 1, sfx: 1, music: 1, dynamics })
+    mx.shots.gain.value = shotsGain
     STRESS.forEach((name, i) =>
       buildOneShot(
         oc,
@@ -226,9 +235,10 @@ export async function measureStress(): Promise<{ voices: number; preLimiterPeakD
     )
     return stats(await oc.startRendering())
   }
-  const pre = await render(false)
-  const post = await render(true)
-  return { voices: STRESS.length, preLimiterPeakDb: db(pre.peak), peakDb: db(post.peak) }
+  const pre = await render(false, 1)
+  const post = await render(true, 1)
+  const engine = await render(true, shots)
+  return { voices: STRESS.length, preLimiterPeakDb: db(pre.peak), peakDb: db(post.peak), crowdGainDb: db(shots), enginePeakDb: db(engine.peak) }
 }
 
 export async function runMeasurement(what = 'all'): Promise<Record<string, unknown>> {

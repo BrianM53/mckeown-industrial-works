@@ -34,12 +34,19 @@ export default function QuickLinksPanel({ onClose }: PanelComponentProps) {
     { id: 'contact', title: 'Contact', sub: contactOptions().map((o) => CONTACT_KIND_LABEL[o.kind]).join(', '), icon: 'mail', color: ZONES.intake.color },
     { id: 'about', title: 'About', sub: 'Who Brian is · how this site works', icon: 'info' },
   ]
-  const factory: Tile[] = [
-    { id: 'directory', title: 'Directory', sub: 'Map, routes & fast travel', icon: 'map' },
-    { id: 'settings', title: 'Settings', sub: 'Sound, motion, camera', icon: 'sliders' },
-    { id: 'help', title: 'Help', sub: 'Controls & wayfinding', icon: 'help' },
-    { id: 'achievements', title: 'Achievements', sub: 'Visitor trophies', icon: 'trophy' },
-  ]
+  // Without the 3D world there are no routes, camera or trophies to offer: say only what works.
+  const factory: Tile[] = game
+    ? [
+        { id: 'directory', title: 'Directory', sub: 'Map, routes & fast travel', icon: 'map' },
+        { id: 'settings', title: 'Settings', sub: 'Sound, motion, camera', icon: 'sliders' },
+        { id: 'help', title: 'Help', sub: 'Controls & wayfinding', icon: 'help' },
+        { id: 'achievements', title: 'Achievements', sub: 'Visitor trophies', icon: 'trophy' },
+      ]
+    : [
+        { id: 'directory', title: 'Directory', sub: 'Site map & every destination', icon: 'map' },
+        { id: 'settings', title: 'Settings', sub: 'Motion & display', icon: 'sliders' },
+        { id: 'help', title: 'Help', sub: 'Finding your way around', icon: 'help' },
+      ]
 
   const go = (id: PanelId) => (e: MouseEvent<HTMLButtonElement>) => openPanelFromControl(id, e)
 
@@ -79,8 +86,8 @@ export default function QuickLinksPanel({ onClose }: PanelComponentProps) {
           </li>
         ))}
       </ul>
-      <h3 className="miw-ql__group">Factory</h3>
-      <ul className="miw-ql miw-ql--small">
+      <h3 className="miw-ql__group">{game ? 'Factory' : 'Site'}</h3>
+      <ul className={`miw-ql miw-ql--small${factory.length === 3 ? ' miw-ql--three' : ''}`}>
         {factory.map((t) => (
           <li key={t.id}>
             <button type="button" className="miw-ql__tile miw-ql__tile--small" onClick={go(t.id)} data-testid={`ql-${t.id}`}>

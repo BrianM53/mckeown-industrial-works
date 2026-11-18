@@ -766,7 +766,8 @@ export const SFX_META = {
   footstep: m({ peakDb: -16, minInterval: 0.18, maxVoices: 3, ref: 5, rolloff: 1.4, max: 25, priority: 0.5 }),
   'footstep-metal': m({ peakDb: -15, minInterval: 0.18, maxVoices: 3, ref: 5, rolloff: 1.4, max: 25, priority: 0.5 }),
   interact: m({ peakDb: -16, minInterval: 0.08, maxVoices: 2 }),
-  'printer-whir': m({ peakDb: -14, minInterval: 0.5, maxVoices: 1, onLimit: 'reject', max: 30 }),
+  // printer + shredder (résumé machine) and the NPC memo gag overlap whirs: allow two, newest wins
+  'printer-whir': m({ peakDb: -14, minInterval: 0.5, maxVoices: 2, onLimit: 'steal', max: 30 }),
   'print-stamp': m({ peakDb: -8, minInterval: 0.2, maxVoices: 2, ref: 5, max: 35, reverb: 0.15 }),
   'tube-whoosh': m({ peakDb: -12, minInterval: 0.3, maxVoices: 2, max: 30 }),
   'press-thump': m({ peakDb: -6, minInterval: 0.12, maxVoices: 3, ref: 5, max: 40, reverb: 0.18 }),

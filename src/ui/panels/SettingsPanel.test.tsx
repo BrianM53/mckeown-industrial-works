@@ -102,6 +102,13 @@ describe('Settings panel', () => {
     expect(s().muted).toBe(false)
   })
 
+  it('in the HTML fallback explains where the preferences apply and offers no sound switch', () => {
+    renderInMode(<SettingsPanel onClose={() => {}} />, 'fallback')
+    expect(screen.getByTestId('settings-fallback-note')).toHaveTextContent(/saved in this browser/i)
+    expect(screen.queryByRole('button', { name: /enable sound/i })).toBeNull()
+    expect(screen.getByRole('switch', { name: 'Reduce motion' })).toBeInTheDocument()
+  })
+
   it('reset restores defaults but keeps this visit’s sound consent', async () => {
     const user = userEvent.setup()
     const defaults = { ...s() }

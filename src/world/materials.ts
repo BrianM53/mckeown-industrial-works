@@ -50,6 +50,35 @@ function noiseRand(seed: number) {
   }
 }
 
+/**
+ * Tileable 2D value noise with lattice period `period` (x, y in lattice units;
+ * wraps every `period` cells), 0..1. Used for seamless procedural textures.
+ */
+function periodicNoise(seed: number, period: number): (x: number, y: number) => number {
+  const P = Math.max(1, Math.round(period))
+  const hash = (ix: number, iy: number) => {
+    const xx = ((ix % P) + P) % P
+    const yy = ((iy % P) + P) % P
+    let h = (xx * 374761393 + yy * 668265263 + seed * 1442695041) | 0
+    h = Math.imul(h ^ (h >>> 13), 1274126177)
+    h ^= h >>> 16
+    return (h >>> 0) / 4294967296
+  }
+  return (x, y) => {
+    const xi = Math.floor(x)
+    const yi = Math.floor(y)
+    const xf = x - xi
+    const yf = y - yi
+    const u = xf * xf * (3 - 2 * xf)
+    const v = yf * yf * (3 - 2 * yf)
+    const a = hash(xi, yi)
+    const b = hash(xi + 1, yi)
+    const c = hash(xi, yi + 1)
+    const d = hash(xi + 1, yi + 1)
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v
+  }
+}
+
 export const textures = {
   /** Diagonal yellow/black hazard stripes. */
   hazardStripes(): THREE.Texture {
@@ -340,6 +369,75 @@ export const textures = {
     t.colorSpace = THREE.NoColorSpace
     t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
     return t
+  },
+  /**
+   * Seamless poured-slab concrete for large world-space ground sampling: soft
+   * multi-octave mottling, aggregate speckle and a few pits — no hard-edged
+   * blotches, so it never reads as a repeating pattern of spots.
+   */
+  concreteSlab(): THREE.Texture {
+    return canvasTexture('concreteSlab', 512, (ctx, s) => {
+      const img = ctx.createImageData(s, s)
+      const octaves: [number, number, number][] = [
+        // [lattice period across the texture, amplitude, seed]
+        [3, 15, 11],
+        [6, 11, 23],
+        [12, 7, 37],
+        [24, 5, 41],
+        [64, 4, 53],
+      ]
+      const noises = octaves.map(([p, , seed]) => periodicNoise(seed, p))
+      for (let y = 0; y < s; y++)
+        for (let x = 0; x < s; x++) {
+          let v = 138
+          for (let o = 0; o < octaves.length; o++) {
+            const p = octaves[o][0]
+            v += (noises[o]((x / s) * p, (y / s) * p) - 0.5) * 2 * octaves[o][1]
+          }
+          const i = (y * s + x) * 4
+          img.data[i] = v
+          img.data[i + 1] = v - 1
+          img.data[i + 2] = v - 9
+          img.data[i + 3] = 255
+        }
+      ctx.putImageData(img, 0, 0)
+      const r = noiseRand(61)
+      // aggregate speckle (light and dark)
+      for (let i = 0; i < 9000; i++) {
+        const light = r() < 0.5
+        const v = light ? 168 + Math.floor(r() * 50) : 70 + Math.floor(r() * 40)
+        ctx.fillStyle = `rgba(${v},${v},${v - 6},${0.1 + r() * 0.22})`
+        const w = 0.8 + r() * 1.8
+        ctx.fillRect(r() * s, r() * s, w, w)
+      }
+      // small pits / chips
+      for (let i = 0; i < 90; i++) {
+        const x = r() * s
+        const y = r() * s
+        ctx.fillStyle = `rgba(52,48,42,${0.18 + r() * 0.2})`
+        ctx.beginPath()
+        ctx.arc(x, y, 0.8 + r() * 2.2, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      // a few hairline cracks
+      ctx.lineWidth = 1
+      for (let i = 0; i < 7; i++) {
+        let x = r() * s
+        let y = r() * s
+        let a = r() * Math.PI * 2
+        ctx.strokeStyle = `rgba(48,44,38,${0.14 + r() * 0.12})`
+        ctx.beginPath()
+        ctx.moveTo(x, y)
+        const n = 6 + Math.floor(r() * 10)
+        for (let k = 0; k < n; k++) {
+          a += (r() - 0.5) * 0.9
+          x += Math.cos(a) * (5 + r() * 9)
+          y += Math.sin(a) * (5 + r() * 9)
+          ctx.lineTo(x, y)
+        }
+        ctx.stroke()
+      }
+    })
   },
   /** Radial glow dot (white, alpha falloff) for halos and light cones. */
   glowDot(): THREE.Texture {

@@ -14,10 +14,26 @@ export const envLight = {
   time: 0,
 }
 
+/**
+ * Dev/test-only visual override (set through `__MIW__.environment.setLighting`).
+ * Only the environment's rendering reads it — runtime.lighting stays owned by
+ * the safety module (single writer), so the real Night Shift is unaffected.
+ */
+let debugOverride: { level: number; emergency: number } | null = null
+
+export function setLightingOverride(o: { level: number; emergency: number } | null): void {
+  debugOverride = o
+}
+
+export function getLightingOverride(): { level: number; emergency: number } | null {
+  return debugOverride
+}
+
+const clamp01 = (v: number, fallback: number) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback)
+
 export function sampleLighting(dt: number): void {
-  const l = runtime.lighting.level
-  const e = runtime.lighting.emergency
-  envLight.level = Number.isFinite(l) ? Math.min(1, Math.max(0, l)) : 1
-  envLight.emergency = Number.isFinite(e) ? Math.min(1, Math.max(0, e)) : 0
-  envLight.time += Math.min(Math.max(dt, 0), 0.1)
+  const src = debugOverride ?? runtime.lighting
+  envLight.level = clamp01(src.level, 1)
+  envLight.emergency = clamp01(src.emergency, 0)
+  envLight.time += Math.min(Math.max(Number.isFinite(dt) ? dt : 0, 0), 0.1)
 }

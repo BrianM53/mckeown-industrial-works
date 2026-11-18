@@ -62,6 +62,9 @@ function makeNoiseBuffer(ctx: BaseAudioContext, color: NoiseColor): AudioBuffer 
   const fade = Math.floor(sr * 0.04)
   const raw = generateNoise(color, len + fade, sr, createRng(SEEDS[color]))
   const data = makeLoopable(raw, len, fade)
+  // a 2.5 s slice of pink/brown noise has a noticeable mean: remove it so loops
+  // never carry DC (wasted headroom, steps when an emitter starts or stops)
+  removeDc(data)
   if (color === 'crackle') normalizePeak(data, 0.9)
   else normalizeRms(data, 0.25)
   const buf = ctx.createBuffer(1, len, sr)

@@ -28,10 +28,13 @@ export interface SiteMapProps {
   showPlayer: boolean
   routeTarget: ZoneId | null
   highlight?: ZoneId | null
+  /** Pointer convenience only (the directory list is the accessible UI): click a zone to find its entry. */
   onSelectZone?: (id: ZoneId) => void
+  /** Zones that react to clicks (default: all, when onSelectZone is given). */
+  selectable?: ReadonlySet<ZoneId>
 }
 
-export function SiteMap({ showPlayer, routeTarget, highlight, onSelectZone }: SiteMapProps) {
+export function SiteMap({ showPlayer, routeTarget, highlight, onSelectZone, selectable }: SiteMapProps) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const player = usePoll<[number, number, number] | null>(
     () => (showPlayer ? [round1(runtime.player.position.x), round1(runtime.player.position.z), Math.round(runtime.player.facing * 20) / 20] : null),
@@ -98,7 +101,12 @@ export function SiteMap({ showPlayer, routeTarget, highlight, onSelectZone }: Si
 
       {/* zones */}
       {zones.map((z) => (
-        <ZoneBlock key={z.id} zone={z} active={z.id === routeTarget || z.id === highlight} onSelect={onSelectZone} />
+        <ZoneBlock
+          key={z.id}
+          zone={z}
+          active={z.id === routeTarget || z.id === highlight}
+          onSelect={onSelectZone && (!selectable || selectable.has(z.id)) ? onSelectZone : undefined}
+        />
       ))}
 
       {/* tower + pad */}

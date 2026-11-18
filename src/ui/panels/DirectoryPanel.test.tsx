@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { provideService, type PlayerService } from '@/core/services'
@@ -103,9 +103,12 @@ describe('Directory panel', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('disables "Travel there" until the player service exists', () => {
+  it('disables "Travel there" until the player service exists, then enables it without reopening', async () => {
     renderInMode(<DirectoryPanel onClose={() => {}} />, 'game')
-    expect(within(screen.getByTestId('dest-personnel')).getByRole('button', { name: /travel there/i })).toBeDisabled()
+    const travel = within(screen.getByTestId('dest-personnel')).getByRole('button', { name: /travel there/i })
+    expect(travel).toBeDisabled()
+    mockPlayer() // the world finished loading while the directory was open
+    await waitFor(() => expect(travel).toBeEnabled())
   })
 
   it('fallback mode offers only "Open now" and hides world-only destinations', () => {

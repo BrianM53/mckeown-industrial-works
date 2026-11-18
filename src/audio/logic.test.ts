@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   admitVoice,
   computeCull,
+  CROWD_FULL,
   crowdGain,
+  crowdWeight,
   DuckController,
   edgeFade,
   envelopeWeight,
@@ -16,6 +18,7 @@ import {
   phaseCrossed,
   RateLimiter,
   SPATIAL,
+  voiceLoudness,
   volumeToGain,
   type CullItem,
   type VoiceSlot,
@@ -76,6 +79,46 @@ describe('RateLimiter', () => {
     expect(r.allow('x', 1.01, 1)).toBe(true)
     r.reset()
     expect(r.allow('x', 1.02, 1)).toBe(true)
+  })
+  it('limits positional plays per source: the same spot is limited, a different spot is not', () => {
+    const r = new RateLimiter()
+    expect(r.allow('crate-bump', 5, 0.1, 10, 10)).toBe(true)
+    // same crate (within the radius) → limited
+    expect(r.allow('crate-bump', 5.02, 0.1, 10.5, 10.4)).toBe(false)
+    // another crate 6 m away at the same moment → plays
+    expect(r.allow('crate-bump', 5.03, 0.1, 16, 10)).toBe(true)
+    // the passer-by's footstep does not silence the player's
+    expect(r.allow('footstep', 6, 0.18, 0, 30)).toBe(true)
+    expect(r.allow('footstep', 6.05, 0.18, 5, 30)).toBe(true)
+    expect(r.allow('footstep', 6.1, 0.18, 0.3, 30.2)).toBe(false)
+    expect(r.allow('footstep', 6.2, 0.18, 0.6, 30.4)).toBe(true)
+  })
+  it('a non-positional play conflicts with every recent play of the name', () => {
+    const r = new RateLimiter()
+    expect(r.allow('whistle', 1, 0.4, 3, 3)).toBe(true)
+    expect(r.allow('whistle', 1.1, 0.4)).toBe(false)
+    expect(r.allow('whistle', 1.5, 0.4)).toBe(true)
+    expect(r.allow('whistle', 1.6, 0.4, 40, 40)).toBe(false)
+  })
+  it('remembers a bounded number of recent plays per name', () => {
+    const r = new RateLimiter()
+    for (let i = 0; i < 100; i++) expect(r.allow('step', i * 0.001, 0.18, i * 3, 0)).toBe(true)
+    // the most recent sources still block their own spot
+    expect(r.allow('step', 0.1, 0.18, 99 * 3, 0)).toBe(false)
+  })
+})
+
+describe('voice loudness (what stealing and crowd normalization compare)', () => {
+  it('uses the normalized peak target, volume, distance and walls', () => {
+    expect(voiceLoudness(0, 1, 1, 1)).toBe(1)
+    expect(voiceLoudness(-6, 1, 1, 1)).toBeCloseTo(0.501, 3)
+    expect(voiceLoudness(-6, 0.5, 0.5, 0.5)).toBeCloseTo(0.0627, 3)
+    expect(voiceLoudness(-6, Number.NaN, 1, 1)).toBe(0)
+    expect(voiceLoudness(-6, 1, 0, 1)).toBe(0)
+  })
+  it('a big explosion outranks a quieter clank at the same distance', () => {
+    const g = inverseDistanceGain(20, 4, 1.2)
+    expect(voiceLoudness(-2, 1, g, 1) * 3).toBeGreaterThan(voiceLoudness(-6, 1, g, 1) * 2)
   })
 })
 
@@ -166,6 +209,14 @@ describe('spatial culling', () => {
     expect(items[0].want).toBe(true)
   })
 
+  it('silent loops (volume 0) are never realized and free their slot', () => {
+    const quiet = { ...item(1, 'belt', 5, true), weight: 0 }
+    const loud = { ...item(2, 'belt', 9), weight: 0.7 }
+    const music = { ...item(3, 'music', 0, false, false), weight: 0 }
+    computeCull([quiet, loud, music], { ...opts, perName: () => 1 })
+    expect([quiet.want, loud.want, music.want]).toEqual([false, true, false])
+  })
+
   it('caps instances per name (nearest win) and in total', () => {
     const items = [1, 2, 3, 4, 5].map((k) => item(k, 'belt', k * 5))
     computeCull(items, { ...opts, perName: () => 3 })
@@ -225,6 +276,13 @@ describe('helpers', () => {
     expect(crowdGain(4)).toBe(1)
     expect(crowdGain(16)).toBeCloseTo(0.5)
     expect(crowdGain(Number.NaN)).toBe(1)
+  })
+  it('crowd weight: loud voices count fully, quiet / distant ones partially', () => {
+    expect(crowdWeight(1)).toBe(1)
+    expect(crowdWeight(CROWD_FULL)).toBe(1)
+    expect(crowdWeight(CROWD_FULL / 4)).toBeCloseTo(0.25)
+    expect(crowdWeight(0)).toBe(0)
+    expect(crowdWeight(Number.NaN)).toBe(0)
   })
   it('impact volume grows with strength and is clamped', () => {
     expect(impactVolume(0)).toBe(0.2)
