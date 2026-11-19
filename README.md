@@ -5,7 +5,7 @@ Walk an anonymous hard-hat worker around a dense industrial campus with a third-
 
 > *The factory can be dysfunctional. The website cannot.*
 
-- **Live site:** https://brianm53.github.io/mckeown-industrial-works/
+- **Live site:** https://brianm53.github.io/mckeown-industrial-works/ (also on Google Cloud Run: https://mckeown-industrial-works-130645867703.us-central1.run.app/)
 - **Plain HTML portfolio (no 3D, no JavaScript needed):** https://brianm53.github.io/mckeown-industrial-works/portfolio/
 - **Lite mode inside the app:** append `?lite=1`
 
@@ -107,6 +107,14 @@ npm run deploy:pages
 It typechecks, builds with `BASE_PATH=/mckeown-industrial-works/`, prerenders the static pages and force-pushes the output to the `gh-pages` branch. Pages is set to *Deploy from a branch → gh-pages /*, and GitHub publishes the update in about a minute. Verify with `npm run smoke -- https://brianm53.github.io/mckeown-industrial-works/` and `npm run check:live -- https://brianm53.github.io/mckeown-industrial-works/ shots/live.png`. HTTPS and gzip are automatic. Hashed `assets/*` are cacheable, and `404.html` provides the SPA fallback.
 
 There is also a fully automated workflow, `.github/workflows/deploy.yml`: typecheck, unit tests, build, smoke test, then `actions/deploy-pages`. It is currently set to manual (`workflow_dispatch`) because **GitHub Actions jobs refuse to start on this account ("account is locked due to a billing issue")**. Once that's resolved, restore its `push: branches: [main]` trigger (see the comment in the file) and switch Settings → Pages → Source to *GitHub Actions*.
+
+**Google Cloud Run (live):** https://mckeown-industrial-works-130645867703.us-central1.run.app/ (project `mckeown-industrial-works`, region `us-central1`). Run
+
+```bash
+npm run deploy:gcp
+```
+
+It builds with `BASE_PATH=/` and `SITE_URL` set to the Cloud Run URL, bakes `dist-gcp/` into an nginx image (`deploy/cloudrun/`), smoke-tests that image locally, pushes it to Artifact Registry and deploys it (scale to zero, at most 3 instances), then smoke-tests the live URL. nginx sends the same security headers and cache rules as `netlify.toml`. Needs `gcloud` logged in, Docker, and billing on the project. Set `SITE_URL` when you add a custom domain; `LOCAL_ONLY=1` stops after the local test.
 
 **Netlify / Vercel:** `netlify.toml` and `vercel.json` provide the same build plus long-cache headers for hashed assets, no-cache HTML, security headers (including a CSP compatible with Rapier WASM) and an SPA fallback that doesn't shadow `/portfolio/`. Set `SITE_URL` to your domain and leave `BASE_PATH=/`.
 

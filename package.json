@@ -22,6 +22,7 @@
     "check:links": "tsx scripts/check-links.ts",
     "smoke": "node scripts/smoke.mjs",
     "deploy:pages": "bash scripts/deploy-pages.sh",
+    "deploy:gcp": "bash scripts/deploy-gcp.sh",
     "check:live": "node scripts/livecheck.mjs"
   },
   "dependencies": {

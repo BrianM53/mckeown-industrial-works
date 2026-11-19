@@ -13,3 +13,4 @@ shots
 .vite*
 coverage
 dist-pages
+dist-gcp
