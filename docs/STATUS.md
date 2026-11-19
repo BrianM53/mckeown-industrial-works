@@ -14,7 +14,7 @@ Every phase of the spec is implemented and running in one contiguous world:
 
 ## Deployment
 
-- **Live:** https://brianm53.github.io/mckeown-industrial-works/ (static portfolio at `/portfolio/`), and on Google Cloud Run at https://mckeown-industrial-works-130645867703.us-central1.run.app/ (`npm run deploy:gcp`; nginx with the full security headers, which GitHub Pages can't send).
+- **Live:** https://brianm53.github.io/mckeown-industrial-works/ (static portfolio at `/portfolio/`), and on Google Cloud Run at **https://brianmckeown.us/** (`www.` redirects; service URL https://mckeown-industrial-works-130645867703.us-central1.run.app/; `npm run deploy:gcp`; nginx with the full security headers, which GitHub Pages can't send).
 - **How:** `npm run deploy:pages` pushes a prebuilt site to the `gh-pages` branch. GitHub Actions jobs refuse to start on the owner's account ("account is locked due to a billing issue"), so the fully automated `.github/workflows/deploy.yml` (typecheck → tests → build → smoke → Pages deploy) is set to manual for now. To switch back, restore its `push` trigger and set Pages → Source to *GitHub Actions*.
 - GitHub Pages can't send custom HTTP headers, so the CSP and security headers apply only on Netlify/Vercel (configs included). On a project site, `robots.txt` isn't read at the domain root, so submit `sitemap.xml` through Search Console.
 

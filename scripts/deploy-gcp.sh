@@ -6,7 +6,8 @@
 #   LOCAL_ONLY=1 npm run deploy:gcp    # build + test the image on http://127.0.0.1:8088/ only
 #
 # Needs: gcloud (logged in), Docker, and a GCP project with billing linked.
-# Overrides: GCP_PROJECT, GCP_REGION, GCP_SERVICE, SITE_URL (set this for a custom domain).
+# Overrides: GCP_PROJECT, GCP_REGION, GCP_SERVICE, SITE_URL (public URL; defaults to the custom domain
+# below; set SITE_URL=run.app to build for the service's own https://SERVICE-NUMBER.REGION.run.app/ URL).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,8 +24,10 @@ if [ -n "$(git status --porcelain)" ]; then
   echo "warning: working tree has uncommitted changes; they will be deployed too." >&2
 fi
 
+# Custom domain (mapped with `gcloud beta run domain-mappings`; www.* redirects to it in nginx.conf).
+SITE_URL="${SITE_URL:-https://brianmckeown.us/}"
 # Cloud Run's deterministic service URL: https://SERVICE-PROJECT_NUMBER.REGION.run.app/
-if [ -z "${SITE_URL:-}" ]; then
+if [ "$SITE_URL" = "run.app" ]; then
   NUM="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')"
   SITE_URL="https://$SERVICE-$NUM.$REGION.run.app/"
 fi
