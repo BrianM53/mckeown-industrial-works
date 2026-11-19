@@ -9,8 +9,6 @@ Walk an anonymous hard-hat worker around a dense industrial campus with a third-
 - **Plain HTML portfolio (no 3D, no JavaScript needed):** https://brianm53.github.io/mckeown-industrial-works/portfolio/
 - **Lite mode inside the app:** append `?lite=1`
 
-Every real fact on the site (role, résumé, projects, podcast, links) comes from `src/content/*.ts`, sourced from Brian's own GitHub profile, his current site, the Code Story episode page and tryharmony.ai. The factory's workers, the "CEO" mythology, production numbers, launch results and safety incidents are labelled as fiction. See [`docs/OWNER_REVIEW.md`](docs/OWNER_REVIEW.md) for the items awaiting Brian's confirmation.
-
 ![Spawn view](docs/screenshots/01-spawn.png)
 
 | | | |
